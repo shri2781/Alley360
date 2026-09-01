@@ -10,6 +10,7 @@
     "db:seed": "tsx src/db/seed.ts",
     "prove:constraint": "tsx scripts/prove-constraint.ts",
     "estimator:table": "tsx scripts/estimator-table.ts",
+    "scheduler:demo": "tsx scripts/scheduler-demo.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

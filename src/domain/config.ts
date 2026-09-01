@@ -63,3 +63,38 @@ export const DEFAULT_ESTIMATOR_CONFIG: EstimatorConfig = {
   bufferMultiplier: 1.15,
   slotGridMin: 15,
 };
+
+/**
+ * Scheduler tuning. At 4 lanes there's no real optimisation problem to solve — just
+ * enumerate every grid-aligned candidate start near what was asked for, reject the
+ * infeasible ones, and score what's left. These constants are what "good" means:
+ * how far from the request is acceptable, and what counts as a wasted gap vs. a
+ * clean fit. Guesses, same as the estimator's constants — correct after real use.
+ */
+export type SchedulerConfig = {
+  /** How far from the requested time to look for candidates, each direction. */
+  candidateWindowMin: number;
+  /** A gap this small or smaller next to a placement counts as a clean fit — bonus. */
+  perfectFitThresholdMin: number;
+  /** A gap bigger than the perfect-fit threshold but smaller than this is "stranded"
+   *  — too small to be useful to the next booking, too big to call a clean fit. Penalty. */
+  orphanGapThresholdMin: number;
+  /** Cost per minute of distance between a candidate and the requested start. */
+  preferenceWeight: number;
+  /** Cost per stranded gap (before and/or after) a candidate would create. */
+  orphanGapWeight: number;
+  /** Reward per clean-fit gap (before and/or after) a candidate would create. */
+  perfectFitWeight: number;
+  /** How many ranked candidates to return at most. */
+  maxCandidates: number;
+};
+
+export const DEFAULT_SCHEDULER_CONFIG: SchedulerConfig = {
+  candidateWindowMin: 90,
+  perfectFitThresholdMin: 10,
+  orphanGapThresholdMin: 45,
+  preferenceWeight: 1.0,
+  orphanGapWeight: 0.5,
+  perfectFitWeight: 15,
+  maxCandidates: 5,
+};
