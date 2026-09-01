@@ -57,6 +57,30 @@ export function businessDate(instant: Date, timeZone: string, rolloverHour: numb
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 }
 
+/**
+ * The UTC instant corresponding to a given hour, on a given business date, in venue-local
+ * wall-clock time. E.g. zonedInstant("2026-09-12", 10, "Asia/Kolkata") is the UTC instant
+ * that displays as 10:00 AM in Kolkata that day (India is UTC+5:30 -- not a whole hour, so
+ * this can't be done with a fixed offset).
+ *
+ * Standard double-conversion trick: guess the instant naively (as if the local time were
+ * UTC), see what that guess actually displays as in the target zone, then correct by the
+ * difference. Converges in one step for any timezone whose offset doesn't itself change
+ * between the guess and the correction -- true for every case this app needs (bowling
+ * alley opening hours are never scheduled across a DST transition instant).
+ */
+export function zonedInstant(businessDate: string, hour: number, timeZone: string): Date {
+  const [year, month, day] = businessDate.split("-").map(Number) as [number, number, number];
+
+  const guess = new Date(Date.UTC(year, month - 1, day, hour, 0, 0));
+  const actual = zonedParts(guess, timeZone);
+
+  const wantedMs = Date.UTC(year, month - 1, day, hour, 0);
+  const gotMs = Date.UTC(actual.year, actual.month - 1, actual.day, actual.hour, actual.minute);
+
+  return new Date(guess.getTime() + (wantedMs - gotMs));
+}
+
 export function addMinutes(instant: Date, minutes: number): Date {
   return new Date(instant.getTime() + minutes * 60_000);
 }

@@ -15,7 +15,7 @@ Built as a lean MVP: staff operations first, customer-facing booking later.
 | M2 — Duration estimator | ✅ Done, verified |
 | M3 — Availability scheduler | ✅ Done, verified |
 | M4 — Staff lane dashboard | Not started |
-| M5 — Booking create/start/end/cancel | Not started |
+| M5 — Booking create/start/end/cancel | ✅ Service layer done, verified (no UI yet) |
 | M6 — Multi-lane party bookings | Not started |
 | M7 — Testing & polish | Not started |
 
@@ -47,6 +47,7 @@ npm run db:reset             # builds the schema and seeds one venue + 4 lanes
 | `npm run prove:constraint` | Proves the overlap-prevention database constraint actually works, against a live Postgres |
 | `npm run estimator:table` | Prints the duration-estimate grid for a range of players/games — useful for sanity-checking the numbers against a real venue |
 | `npm run scheduler:demo` | Loads a fixture day and prints ranked available times for a sample booking request |
+| `npm run booking:demo` | Exercises the real booking service (availability, create, start, end, cancel, block) against a live Postgres |
 | `npm test` | Runs the unit test suite (pure domain logic, no database) |
 | `npm run typecheck` | TypeScript type-checking, no build output |
 
@@ -57,8 +58,11 @@ src/
   domain/     Pure logic — duration estimation, availability scheduling,
               time/business-date handling. No I/O.
   db/         Database schema (SQL + typed Drizzle mirror), connection, seed data.
+  server/
+    services/ Booking lifecycle (create/cancel/block, start/end session) — real I/O,
+              composes the domain logic with the database.
 scripts/      One-off tools: reset the DB, seed it, verify the constraint,
-              print the estimator grid, demo the scheduler.
+              print the estimator grid, demo the scheduler and booking service.
 ```
 
 The database schema (`src/db/schema.sql`) is the source of truth for the data model; `src/db/schema.ts`

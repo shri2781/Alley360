@@ -9,11 +9,19 @@ import { lane, tenant } from "./schema.js";
 const VENUE_NAME = process.env.VENUE_NAME ?? "Demo Bowling Alley";
 const VENUE_TIMEZONE = process.env.VENUE_TIMEZONE ?? "Asia/Kolkata";
 const LANE_COUNT = Number(process.env.VENUE_LANE_COUNT ?? 4);
+const OPENS_AT_HOUR = Number(process.env.VENUE_OPENS_AT_HOUR ?? 10);
+const CLOSES_AT_HOUR = Number(process.env.VENUE_CLOSES_AT_HOUR ?? 22);
 
 export async function seed() {
   const [venue] = await db
     .insert(tenant)
-    .values({ name: VENUE_NAME, timezone: VENUE_TIMEZONE, dayRolloverHour: 4 })
+    .values({
+      name: VENUE_NAME,
+      timezone: VENUE_TIMEZONE,
+      dayRolloverHour: 4,
+      opensAtHour: OPENS_AT_HOUR,
+      closesAtHour: CLOSES_AT_HOUR,
+    })
     .returning();
 
   if (!venue) throw new Error("failed to insert tenant");

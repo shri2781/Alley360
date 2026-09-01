@@ -45,6 +45,8 @@ export const tenant = pgTable("tenant", {
   name: text("name").notNull(),
   timezone: text("timezone").notNull(),
   dayRolloverHour: integer("day_rollover_hour").notNull().default(4),
+  opensAtHour: integer("opens_at_hour").notNull().default(10),
+  closesAtHour: integer("closes_at_hour").notNull().default(22),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

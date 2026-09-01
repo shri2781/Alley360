@@ -31,9 +31,12 @@ CREATE TABLE tenant (
   name               text        NOT NULL,
   timezone           text        NOT NULL,              -- IANA, e.g. 'Asia/Kolkata'
   day_rollover_hour  int         NOT NULL DEFAULT 4,    -- a 00:30 session belongs to the previous business day
+  opens_at_hour      int         NOT NULL DEFAULT 10,   -- venue-local hour bookings can start from
+  closes_at_hour     int         NOT NULL DEFAULT 22,   -- venue-local hour after which no new bookings occupy a lane
   created_at         timestamptz NOT NULL DEFAULT now(),
 
-  CONSTRAINT tenant_rollover_valid CHECK (day_rollover_hour BETWEEN 0 AND 12)
+  CONSTRAINT tenant_rollover_valid CHECK (day_rollover_hour BETWEEN 0 AND 12),
+  CONSTRAINT tenant_hours_valid CHECK (opens_at_hour >= 0 AND closes_at_hour <= 24 AND opens_at_hour < closes_at_hour)
 );
 
 -- ---------------------------------------------------------------------------
