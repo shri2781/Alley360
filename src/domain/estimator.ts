@@ -4,7 +4,7 @@
  * See src/domain/config.ts for the three duration quantities (base / play / occupy)
  * and why the buffer is not part of the central estimate.
  */
-import { DEFAULT_ESTIMATOR_CONFIG, type EstimatorConfig } from "./config.js";
+import { DEFAULT_ESTIMATOR_CONFIG, type EstimatorConfig } from "./config";
 
 export type DurationEstimate = {
   /** Central estimate — comparable to the ~10 min/player/game rule of thumb. */

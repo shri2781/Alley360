@@ -18,9 +18,9 @@ import {
   DEFAULT_SCHEDULER_CONFIG,
   type EstimatorConfig,
   type SchedulerConfig,
-} from "./config.js";
-import { estimateDuration } from "./estimator.js";
-import { addMinutes, minutesBetween } from "./time.js";
+} from "./config";
+import { estimateDuration } from "./estimator";
+import { addMinutes, minutesBetween } from "./time";
 
 export type Lane = {
   id: string;

@@ -2,8 +2,8 @@
  * Baseline seed: one venue and its lanes. Nothing else — a believable busy Saturday
  * for demos is a separate `demo:seed` script in M7.
  */
-import { db, sql } from "./client.js";
-import { lane, tenant } from "./schema.js";
+import { db, sql } from "./client";
+import { lane, tenant } from "./schema";
 
 /** Placeholder venue settings. Set VENUE_TIMEZONE, or change these for the real alley. */
 const VENUE_NAME = process.env.VENUE_NAME ?? "Demo Bowling Alley";

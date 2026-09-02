@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_ESTIMATOR_CONFIG, DEFAULT_SCHEDULER_CONFIG } from "./config.js";
-import { findCandidates, type Allocation, type Lane, type ScheduleSnapshot } from "./scheduler.js";
+import { DEFAULT_ESTIMATOR_CONFIG, DEFAULT_SCHEDULER_CONFIG } from "./config";
+import { findCandidates, type Allocation, type Lane, type ScheduleSnapshot } from "./scheduler";
 
 const DAY = "2026-09-12";
 const t = (hm: string) => new Date(`${DAY}T${hm}:00.000Z`);

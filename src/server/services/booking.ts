@@ -3,13 +3,13 @@
  * transaction -- either the whole thing happens, or none of it does.
  */
 import { eq } from "drizzle-orm";
-import { db } from "../../db/client.js";
-import { tstzrangeLiteral } from "../../db/range.js";
-import { booking, laneAllocation } from "../../db/schema.js";
-import { DEFAULT_ESTIMATOR_CONFIG, DEFAULT_SCHEDULER_CONFIG } from "../../domain/config.js";
-import { estimateDuration } from "../../domain/estimator.js";
-import { addMinutes, businessDate } from "../../domain/time.js";
-import { getAvailability, type AvailabilityRequest, type Venue } from "./availability.js";
+import { db } from "../../db/client";
+import { tstzrangeLiteral } from "../../db/range";
+import { booking, laneAllocation } from "../../db/schema";
+import { DEFAULT_ESTIMATOR_CONFIG, DEFAULT_SCHEDULER_CONFIG } from "../../domain/config";
+import { estimateDuration } from "../../domain/estimator";
+import { addMinutes, businessDate } from "../../domain/time";
+import { getAvailability, type AvailabilityRequest, type Venue } from "./availability";
 
 const PG_EXCLUSION_VIOLATION = "23P01";
 

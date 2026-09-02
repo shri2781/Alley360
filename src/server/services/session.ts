@@ -8,8 +8,8 @@
  * flips to 'completed' once every one of its sessions has ended.
  */
 import { and, eq } from "drizzle-orm";
-import { db } from "../../db/client.js";
-import { booking, laneAllocation, session } from "../../db/schema.js";
+import { db } from "../../db/client";
+import { booking, laneAllocation, session } from "../../db/schema";
 
 /** Starts every lane a booking covers at once. If `actualPlayers` isn't given, falls
  *  back to what was booked -- lets check-in record a different headcount than planned. */

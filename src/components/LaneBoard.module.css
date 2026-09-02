@@ -1,0 +1,167 @@
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.clock {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+@media (min-width: 700px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.card {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 140px;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.laneName {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.badgeAvailable {
+  background: var(--state-available-bg);
+  border-color: var(--state-available-border);
+  color: var(--state-available-text);
+}
+
+.badgePlaying {
+  background: var(--state-playing-bg);
+  border-color: var(--state-playing-border);
+  color: var(--state-playing-text);
+}
+
+.badgeOverrun {
+  background: var(--state-overrun-bg);
+  border-color: var(--state-overrun-border);
+  color: var(--state-overrun-text);
+}
+
+.badgeBookedSoon {
+  background: var(--state-booked-soon-bg);
+  border-color: var(--state-booked-soon-border);
+  color: var(--state-booked-soon-text);
+}
+
+.badgeMaintenance {
+  background: var(--state-maintenance-bg);
+  border-color: var(--state-maintenance-border);
+  color: var(--state-maintenance-text);
+}
+
+.cardBody {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.customerName {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.emptyState {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.section {
+  margin-top: 32px;
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+
+.upcomingList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.upcomingRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  font-size: 13px;
+}
+
+.upcomingRow:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.upcomingTime {
+  font-weight: 700;
+  width: 64px;
+  flex-shrink: 0;
+}
+
+.upcomingLanes {
+  color: var(--text-muted);
+  width: 60px;
+  flex-shrink: 0;
+}
+
+.upcomingCustomer {
+  flex: 1;
+}
+
+.blockRow {
+  color: var(--text-muted);
+  font-style: italic;
+}

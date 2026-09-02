@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { businessDate, zonedInstant } from "./time.js";
+import { businessDate, zonedInstant } from "./time";
 
 describe("zonedInstant", () => {
   it("handles a half-hour-offset zone (India, UTC+5:30)", () => {

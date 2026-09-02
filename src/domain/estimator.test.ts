@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_ESTIMATOR_CONFIG } from "./config.js";
-import { ceilToGrid, estimateDuration } from "./estimator.js";
+import { DEFAULT_ESTIMATOR_CONFIG } from "./config";
+import { ceilToGrid, estimateDuration } from "./estimator";
 
 const cfg = DEFAULT_ESTIMATOR_CONFIG;
 

@@ -4,23 +4,23 @@
  * real Postgres, the same way prove-constraint.ts verifies the schema.
  */
 import { and, eq, inArray } from "drizzle-orm";
-import { db } from "../../db/client.js";
-import { parseTstzrange } from "../../db/range.js";
-import { lane, laneAllocation } from "../../db/schema.js";
+import { db } from "../../db/client";
+import { parseTstzrange } from "../../db/range";
+import { lane, laneAllocation } from "../../db/schema";
 import {
   DEFAULT_ESTIMATOR_CONFIG,
   DEFAULT_SCHEDULER_CONFIG,
   type EstimatorConfig,
   type SchedulerConfig,
-} from "../../domain/config.js";
+} from "../../domain/config";
 import {
   findCandidates,
   type Allocation,
   type Candidate,
   type Lane as SchedulerLane,
   type ScheduleSnapshot,
-} from "../../domain/scheduler.js";
-import { businessDate, zonedInstant } from "../../domain/time.js";
+} from "../../domain/scheduler";
+import { businessDate, zonedInstant } from "../../domain/time";
 
 /** The subset of a `tenant` row the scheduling code actually needs. */
 export type Venue = {
