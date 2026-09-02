@@ -3,3 +3,6 @@ node_modules/
 .next/
 dist/
 *.log
+
+# Personal local notes -- not shared project documentation.
+BUGS.md

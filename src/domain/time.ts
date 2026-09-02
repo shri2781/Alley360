@@ -58,10 +58,11 @@ export function businessDate(instant: Date, timeZone: string, rolloverHour: numb
 }
 
 /**
- * The UTC instant corresponding to a given hour, on a given business date, in venue-local
- * wall-clock time. E.g. zonedInstant("2026-09-12", 10, "Asia/Kolkata") is the UTC instant
- * that displays as 10:00 AM in Kolkata that day (India is UTC+5:30 -- not a whole hour, so
- * this can't be done with a fixed offset).
+ * The UTC instant corresponding to a given hour:minute, on a given business date, in
+ * venue-local wall-clock time. E.g. zonedInstant("2026-09-12", 10, "Asia/Kolkata") is the
+ * UTC instant that displays as 10:00 AM in Kolkata that day (India is UTC+5:30 -- not a
+ * whole hour, so this can't be done with a fixed offset). `minute` defaults to 0, since
+ * every existing caller (venue opening/closing hours) only ever needs a whole hour.
  *
  * Standard double-conversion trick: guess the instant naively (as if the local time were
  * UTC), see what that guess actually displays as in the target zone, then correct by the
@@ -69,13 +70,13 @@ export function businessDate(instant: Date, timeZone: string, rolloverHour: numb
  * between the guess and the correction -- true for every case this app needs (bowling
  * alley opening hours are never scheduled across a DST transition instant).
  */
-export function zonedInstant(businessDate: string, hour: number, timeZone: string): Date {
+export function zonedInstant(businessDate: string, hour: number, timeZone: string, minute = 0): Date {
   const [year, month, day] = businessDate.split("-").map(Number) as [number, number, number];
 
-  const guess = new Date(Date.UTC(year, month - 1, day, hour, 0, 0));
+  const guess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
   const actual = zonedParts(guess, timeZone);
 
-  const wantedMs = Date.UTC(year, month - 1, day, hour, 0);
+  const wantedMs = Date.UTC(year, month - 1, day, hour, minute);
   const gotMs = Date.UTC(actual.year, actual.month - 1, actual.day, actual.hour, actual.minute);
 
   return new Date(guess.getTime() + (wantedMs - gotMs));

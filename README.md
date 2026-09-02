@@ -15,7 +15,7 @@ Built as a lean MVP: staff operations first, customer-facing booking later.
 | M2 — Duration estimator | ✅ Done, verified |
 | M3 — Availability scheduler | ✅ Done, verified |
 | M4 — Staff lane dashboard | ✅ Done, verified (read-only) |
-| M5 — Booking create/start/end/cancel | ✅ Service layer done, verified (no UI yet) |
+| M5 — Booking create/start/end/cancel | ✅ Service layer + basic customer booking form done, verified |
 | M6 — Multi-lane party bookings | Not started |
 | M7 — Testing & polish | Not started |
 
@@ -68,6 +68,9 @@ src/
     queries.ts  Read-only view assembly for the dashboard (derives each lane's
                 current state from the raw booking/allocation rows).
   app/          Next.js App Router pages.
+                "/" is the staff dashboard; "/book" is a basic, unauthenticated
+                customer booking form (no holds/capacity policy -- deliberately
+                out of scope for a local prototype, see the plan for why).
   components/   React components (plain CSS Modules, no UI library).
 scripts/        One-off tools: reset the DB, seed it, verify the constraint, print the
                 estimator grid, demo the scheduler/booking service, seed a demo board.

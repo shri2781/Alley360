@@ -23,4 +23,16 @@ describe("zonedInstant", () => {
     const instant = zonedInstant("2026-09-12", 14, "Asia/Kolkata");
     expect(businessDate(instant, "Asia/Kolkata", 4)).toBe("2026-09-12");
   });
+
+  it("defaults minute to 0 when omitted", () => {
+    expect(zonedInstant("2026-09-12", 10, "Asia/Kolkata")).toEqual(
+      zonedInstant("2026-09-12", 10, "Asia/Kolkata", 0),
+    );
+  });
+
+  it("preserves an arbitrary minute, not just whole hours", () => {
+    // 7:45 PM in Kolkata (UTC+5:30) is 14:15 UTC the same day.
+    const instant = zonedInstant("2026-09-12", 19, "Asia/Kolkata", 45);
+    expect(instant.toISOString()).toBe("2026-09-12T14:15:00.000Z");
+  });
 });
