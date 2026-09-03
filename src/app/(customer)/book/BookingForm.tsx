@@ -249,10 +249,10 @@ export function BookingForm({ packages }: { packages: PackageOption[] }) {
           <strong>{selectedTimeLabel ?? "Not selected yet"}</strong>
         </div>
         <div className={styles.summaryTotal}>
-          <span className={styles.summaryTotalLabel}>Estimated total</span>
+          <span className={styles.summaryTotalLabel}>Total</span>
           <span className={styles.summaryTotalValue}>&#8377;{total}</span>
         </div>
-        <p className={styles.summaryNote}>Estimate only — pay at the venue. Lane assigned automatically.</p>
+        <p className={styles.summaryNote}>Pay at the venue. Lane assigned automatically.</p>
       </aside>
     </div>
   );

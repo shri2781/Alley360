@@ -6,7 +6,7 @@ import { db, sql } from "./client";
 import { lane, pkg, tenant } from "./schema";
 
 /** Placeholder venue settings. Set VENUE_TIMEZONE, or change these for the real alley. */
-const VENUE_NAME = process.env.VENUE_NAME ?? "Demo Bowling Alley";
+const VENUE_NAME = process.env.VENUE_NAME ?? "Alley360";
 const VENUE_TIMEZONE = process.env.VENUE_TIMEZONE ?? "Asia/Kolkata";
 const LANE_COUNT = Number(process.env.VENUE_LANE_COUNT ?? 4);
 const OPENS_AT_HOUR = Number(process.env.VENUE_OPENS_AT_HOUR ?? 10);
