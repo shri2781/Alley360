@@ -1,0 +1,116 @@
+.title {
+  font-size: 26px;
+  font-weight: 800;
+  margin: 0 0 20px;
+}
+
+.list {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 80px 70px 1fr 90px 100px 140px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  font-size: 13px;
+}
+
+.row:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.headerRow {
+  font-weight: 700;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.lanes {
+  color: var(--text-muted);
+}
+
+.customer {
+  font-weight: 600;
+}
+
+.customerMeta {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  width: fit-content;
+}
+
+.badgeConfirmed {
+  background: var(--state-booked-soon-bg);
+  color: var(--state-booked-soon-text);
+}
+
+.badgeActive {
+  background: var(--state-playing-bg);
+  color: var(--state-playing-text);
+}
+
+.badgeCompleted {
+  background: var(--state-available-bg);
+  color: var(--state-available-text);
+}
+
+.badgeCancelled,
+.badgeNoShow {
+  background: var(--state-maintenance-bg);
+  color: var(--state-maintenance-text);
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.btnStart {
+  border-color: var(--state-playing-text);
+  color: var(--state-playing-text);
+}
+
+.btnEnd {
+  border-color: var(--state-available-text);
+  color: var(--state-available-text);
+}
+
+.btnCancel {
+  border-color: var(--state-overrun-text);
+  color: var(--state-overrun-text);
+}
+
+.emptyNote {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}

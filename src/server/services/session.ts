@@ -7,7 +7,7 @@
  * `endSession` operates on a single session/lane at a time. The booking as a whole only
  * flips to 'completed' once every one of its sessions has ended.
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../../db/client";
 import { booking, laneAllocation, session } from "../../db/schema";
 
@@ -80,5 +80,39 @@ export async function endSession(
     }
 
     return ended;
+  });
+}
+
+/**
+ * Ends every still-open session on a booking at once -- the "end linked lanes together"
+ * convenience a multi-lane party needs, which endSession() deliberately doesn't do
+ * (ending one lane at a time is its own valid use case: an early finish on one lane of
+ * a party). This always completes the booking, since it closes every remaining session.
+ */
+export async function endBooking(
+  bookingId: string,
+  opts: { gamesCompleted?: number; endReason?: "normal" | "staff_ended" | "abandoned" } = {},
+) {
+  return db.transaction(async (tx) => {
+    const openSessions = await tx
+      .select()
+      .from(session)
+      .where(and(eq(session.bookingId, bookingId), isNull(session.endedAt)));
+
+    if (openSessions.length === 0) throw new Error(`booking ${bookingId} has no open sessions`);
+
+    await tx
+      .update(session)
+      .set({
+        endedAt: new Date(),
+        gamesCompleted: opts.gamesCompleted,
+        endReason: opts.endReason ?? "normal",
+      })
+      .where(and(eq(session.bookingId, bookingId), isNull(session.endedAt)));
+
+    await tx.update(laneAllocation).set({ status: "released" }).where(eq(laneAllocation.bookingId, bookingId));
+    await tx.update(booking).set({ status: "completed" }).where(eq(booking.id, bookingId));
+
+    return openSessions.length;
   });
 }
