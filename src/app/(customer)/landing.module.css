@@ -1,0 +1,370 @@
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  max-width: 1100px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+}
+
+.navLinksDesktop {
+  display: none;
+  gap: 24px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.navLinksDesktop a {
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.navCta {
+  display: none;
+  font: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: var(--accent-gradient);
+  color: white;
+  text-decoration: none;
+}
+
+.navToggle {
+  display: none;
+}
+
+.navToggleLabel {
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.navMobileMenu {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 12px 20px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.navMobileMenu a {
+  color: var(--text);
+  text-decoration: none;
+  padding: 10px 0;
+  font-size: 15px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+
+.navToggle:checked ~ .navMobileMenu {
+  display: flex;
+}
+
+@media (min-width: 760px) {
+  .navLinksDesktop,
+  .navCta {
+    display: flex;
+    align-items: center;
+  }
+  .navToggleLabel,
+  .navMobileMenu {
+    display: none !important;
+  }
+}
+
+.hero {
+  padding: 32px 20px 40px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.heroKicker {
+  color: var(--accent-2);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.heroTitle {
+  font-size: clamp(30px, 7vw, 52px);
+  font-weight: 900;
+  line-height: 1.08;
+  margin: 12px 0 16px;
+}
+
+.heroTitleAccent {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.heroSubtitle {
+  color: var(--text-muted);
+  font-size: 16px;
+  max-width: 480px;
+  margin: 0 0 24px;
+}
+
+.heroCta {
+  display: inline-block;
+  font-weight: 700;
+  padding: 14px 28px;
+  border-radius: 999px;
+  background: var(--accent-gradient);
+  color: white;
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.statsBar {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px;
+}
+
+@media (min-width: 700px) {
+  .statsBar {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.statCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+
+.statValue {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.statLabel {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.section {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 48px 20px;
+  scroll-margin-top: 70px;
+}
+
+.sectionHeading {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.sectionTitle {
+  font-size: clamp(22px, 4vw, 30px);
+  font-weight: 800;
+  margin: 0 0 8px;
+}
+
+.sectionSubtitle {
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+  margin: 0 0 32px;
+}
+
+.packageGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 700px) {
+  .packageGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.packageCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.packageCardFeatured {
+  border-color: var(--accent-2);
+  background: linear-gradient(180deg, rgba(236, 21, 97, 0.14), var(--surface) 60%);
+}
+
+.packageBadge {
+  align-self: flex-start;
+  background: var(--accent-gradient);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  margin-bottom: 6px;
+}
+
+.packageName {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.packageGames {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.packagePrice {
+  font-size: 26px;
+  font-weight: 800;
+  margin: 8px 0 16px;
+}
+
+.packagePriceUnit {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.packageCta {
+  text-align: center;
+  font-weight: 700;
+  padding: 11px;
+  border-radius: 10px;
+  background: var(--surface-raised);
+  color: var(--text);
+  text-decoration: none;
+  border: 1px solid var(--border);
+}
+
+.packageCardFeatured .packageCta {
+  background: var(--accent-gradient);
+  color: white;
+  border: none;
+}
+
+.amenitiesGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+@media (min-width: 700px) {
+  .amenitiesGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.amenityCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 14px;
+  text-align: center;
+}
+
+.amenityIcon {
+  font-size: 26px;
+  margin-bottom: 8px;
+}
+
+.amenityLabel {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.faqList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.faqItem {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.faqQuestion {
+  font-weight: 700;
+  font-size: 14px;
+  margin: 0 0 6px;
+}
+
+.faqAnswer {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.footer {
+  border-top: 1px solid var(--border);
+  padding: 28px 20px;
+}
+
+.footerInner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  text-align: center;
+}
+
+@media (min-width: 700px) {
+  .footerInner {
+    flex-direction: row;
+    justify-content: space-between;
+    text-align: left;
+  }
+}
+
+.footerInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.footerCta {
+  font-weight: 700;
+  padding: 11px 22px;
+  border-radius: 999px;
+  background: var(--accent-gradient);
+  color: white;
+  text-decoration: none;
+  font-size: 14px;
+  white-space: nowrap;
+}

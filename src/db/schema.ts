@@ -32,7 +32,7 @@ export const bookingStatus = pgEnum("booking_status", [
   "cancelled",
   "no_show",
 ]);
-export const bookingSource = pgEnum("booking_source", ["walkin", "phone", "staff"]);
+export const bookingSource = pgEnum("booking_source", ["walkin", "phone", "staff", "web"]);
 export const allocationStatus = pgEnum("allocation_status", ["confirmed", "active", "released"]);
 export const sessionEndReason = pgEnum("session_end_reason", [
   "normal",
@@ -63,6 +63,24 @@ export const lane = pgTable(
   },
   (t) => ({
     numberUnique: unique("lane_number_positive").on(t.tenantId, t.number),
+  }),
+);
+
+export const pkg = pgTable(
+  "package",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenant.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    games: integer("games").notNull(),
+    pricePerPerson: integer("price_per_person").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+  },
+  (t) => ({
+    tenantIdx: index("package_tenant_idx").on(t.tenantId, t.isActive, t.sortOrder),
   }),
 );
 

@@ -5,6 +5,13 @@ function formatTime(date: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit" }).format(date);
 }
 
+/** A nameless booking isn't necessarily a walk-in -- an online booking with no name
+ *  entered is still an online booking. Only the literal 'walkin' source gets that label. */
+function displayName(customerName: string | null, source: "walkin" | "phone" | "staff" | "web"): string {
+  if (customerName) return customerName;
+  return source === "walkin" ? "Walk-in" : "Guest";
+}
+
 const STATE_LABEL: Record<LaneBoardEntry["state"], string> = {
   available: "Available",
   playing: "Playing",
@@ -34,7 +41,7 @@ function LaneCard({ entry, timezone }: { entry: LaneBoardEntry; timezone: string
         {entry.state === "playing" && entry.current && (
           <>
             <div className={styles.customerName}>
-              {entry.current.customerName ?? "Walk-in"} · {entry.current.partySize} players
+              {displayName(entry.current.customerName, entry.current.source)} · {entry.current.partySize} players
             </div>
             <div>Started {formatTime(entry.current.startedAt, timezone)}</div>
             <div>Expected finish {formatTime(entry.current.expectedFinish, timezone)}</div>
@@ -44,7 +51,8 @@ function LaneCard({ entry, timezone }: { entry: LaneBoardEntry; timezone: string
         {entry.state === "booked-soon" && entry.nextBooking && (
           <>
             <div className={styles.customerName}>
-              {entry.nextBooking.customerName ?? "Walk-in"} · {entry.nextBooking.partySize} players
+              {displayName(entry.nextBooking.customerName, entry.nextBooking.source)} · {entry.nextBooking.partySize}{" "}
+              players
             </div>
             <div>Starts {formatTime(entry.nextBooking.start, timezone)}</div>
           </>
@@ -89,7 +97,7 @@ export function LaneBoard({ data }: { data: LaneBoardData }) {
                 <span className={styles.upcomingTime}>{formatTime(u.start, data.timezone)}</span>
                 <span className={styles.upcomingLanes}>Lane {u.laneNumbers.join(", ")}</span>
                 <span className={styles.upcomingCustomer}>
-                  {u.kind === "block" ? "Blocked" : (u.customerName ?? "Walk-in")} · {u.partySize} players,{" "}
+                  {u.kind === "block" ? "Blocked" : displayName(u.customerName, u.source)} · {u.partySize} players,{" "}
                   {u.games} game{u.games === 1 ? "" : "s"}
                 </span>
               </li>

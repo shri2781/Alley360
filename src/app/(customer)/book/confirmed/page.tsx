@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import { db } from "../../../db/client";
-import { booking as bookingTable, tenant } from "../../../db/schema";
+import { db } from "../../../../db/client";
+import { booking as bookingTable, tenant } from "../../../../db/schema";
 import styles from "../book.module.css";
 
 export default async function ConfirmedPage({

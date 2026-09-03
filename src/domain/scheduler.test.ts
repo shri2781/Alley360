@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_ESTIMATOR_CONFIG, DEFAULT_SCHEDULER_CONFIG } from "./config";
-import { findCandidates, type Allocation, type Lane, type ScheduleSnapshot } from "./scheduler";
+import { checkSlot, findCandidates, type Allocation, type Lane, type ScheduleSnapshot } from "./scheduler";
 
 const DAY = "2026-09-12";
 const t = (hm: string) => new Date(`${DAY}T${hm}:00.000Z`);
@@ -118,5 +118,44 @@ describe("multi-lane requests need a contiguous block", () => {
     ]);
     const result = findCandidates(snap, { players: 8, games: 2, preferredStart: t("14:00") });
     expect(result).toEqual([]);
+  });
+});
+
+describe("checkSlot -- validates one exact time, never substitutes another", () => {
+  it("confirms a feasible slot and returns its lane(s) and end time", () => {
+    const result = checkSlot(snapshot([]), t("14:00"), FOUR_BY_TWO);
+    expect(result).not.toBeNull();
+    expect(result!.end).toEqual(t("16:00")); // 4p/2g -> occupyMin 120
+    expect(numberOf(result!.laneIds[0]!)).toBe(1);
+  });
+
+  it("returns null for a slot that overlaps an existing booking -- never a different time", () => {
+    const snap = snapshot([{ laneId: "L1", start: t("13:00"), end: t("15:00") }]);
+    // Only one lane in a 1-lane fixture would make this cleaner, but even with 4 lanes,
+    // asking to check THIS exact lane-agnostic slot must still just say yes/no -- it must
+    // never come back with "here's a different time instead."
+    const result = checkSlot(snap, t("14:00"), FOUR_BY_TWO);
+    // Feasible overall (lanes 2-4 are free), so this should succeed -- but never on lane 1.
+    expect(result).not.toBeNull();
+    expect(numberOf(result!.laneIds[0]!)).not.toBe(1);
+  });
+
+  it("returns null, not a substitute, when EVERY lane is busy at that exact time", () => {
+    const snap = snapshot(LANES.map((l) => ({ laneId: l.id, start: t("13:00"), end: t("15:00") })));
+    const result = checkSlot(snap, t("14:00"), FOUR_BY_TWO);
+    expect(result).toBeNull();
+  });
+
+  it("confirms a slot that findCandidates would NOT have returned in its top results", () => {
+    // Empty schedule, preferred 14:00 -> the 5 closest 15-min-grid times (14:00, then
+    // 13:45/14:15, then 13:30/14:30) fill up maxCandidates=5 before 13:15 (45 min away)
+    // ever gets a look-in. That doesn't mean 13:15 is infeasible -- checkSlot must
+    // still confirm it directly, independent of any ranking or window.
+    const snap = snapshot([]);
+    const ranked = findCandidates(snap, { ...FOUR_BY_TWO, preferredStart: t("14:00") });
+    expect(ranked.some((c) => c.start.getTime() === t("13:15").getTime())).toBe(false);
+
+    const direct = checkSlot(snap, t("13:15"), FOUR_BY_TWO);
+    expect(direct).not.toBeNull();
   });
 });

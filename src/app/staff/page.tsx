@@ -1,8 +1,8 @@
-import { db } from "../db/client";
-import { tenant } from "../db/schema";
-import { AutoRefresh } from "../components/AutoRefresh";
-import { LaneBoard } from "../components/LaneBoard";
-import { getLaneBoard } from "../server/queries";
+import { db } from "../../db/client";
+import { tenant } from "../../db/schema";
+import { AutoRefresh } from "../../components/AutoRefresh";
+import { LaneBoard } from "../../components/LaneBoard";
+import { getLaneBoard } from "../../server/queries";
 
 export default async function Page() {
   const [venue] = await db.select().from(tenant).limit(1);

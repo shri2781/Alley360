@@ -8,8 +8,9 @@ import { tstzrangeLiteral } from "../../db/range";
 import { booking, laneAllocation } from "../../db/schema";
 import { DEFAULT_ESTIMATOR_CONFIG, DEFAULT_SCHEDULER_CONFIG } from "../../domain/config";
 import { estimateDuration } from "../../domain/estimator";
+import { checkSlot } from "../../domain/scheduler";
 import { addMinutes, businessDate } from "../../domain/time";
-import { getAvailability, type AvailabilityRequest, type Venue } from "./availability";
+import { getAvailability, loadSnapshot, type AvailabilityRequest, type Venue } from "./availability";
 
 const PG_EXCLUSION_VIOLATION = "23P01";
 
@@ -36,7 +37,7 @@ export class BookingConflictError extends Error {
 }
 
 export type CreateBookingInput = AvailabilityRequest & {
-  source: "walkin" | "phone" | "staff";
+  source: "walkin" | "phone" | "staff" | "web";
   customerName?: string;
   customerPhone?: string;
 };
@@ -103,6 +104,67 @@ export async function createBooking(venue: Venue, input: CreateBookingInput) {
   }
 
   throw new BookingConflictError();
+}
+
+/**
+ * Books the EXACT slot the caller specifies -- no re-ranking, no substitution. For a
+ * picker UI where the customer already saw a specific time and chose it: silently
+ * swapping in whatever createBooking()'s ranker currently thinks is "best" would book
+ * something the customer never agreed to. Re-validates against fresh state (something
+ * could have taken it since the list was shown) and fails loudly rather than picking a
+ * different time if it's no longer available.
+ */
+export async function bookSpecificSlot(venue: Venue, input: CreateBookingInput, chosenStart: Date) {
+  const estimatorCfg = DEFAULT_ESTIMATOR_CONFIG;
+  const bDate = businessDate(chosenStart, venue.timezone, venue.dayRolloverHour);
+
+  const snapshot = await loadSnapshot(venue, bDate);
+  const slot = checkSlot(snapshot, chosenStart, input, estimatorCfg);
+  if (!slot) throw new NoAvailabilityError();
+
+  const estimate = estimateDuration(input.players, input.games, estimatorCfg);
+
+  try {
+    return await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(booking)
+        .values({
+          tenantId: venue.id,
+          kind: "open_play",
+          status: "confirmed",
+          source: input.source,
+          customerName: input.customerName,
+          customerPhone: input.customerPhone,
+          partySize: input.players,
+          games: input.games,
+          businessDate: bDate,
+          scheduledStart: chosenStart,
+          estimatedBaseMin: estimate.baseMin,
+          estimatedPlayMin: estimate.playMin,
+          estimatedOccupyMin: estimate.occupyMin,
+        })
+        .returning();
+
+      if (!created) throw new Error("booking insert returned nothing");
+
+      await tx.insert(laneAllocation).values(
+        slot.laneIds.map((laneId) => ({
+          tenantId: venue.id,
+          bookingId: created.id,
+          laneId,
+          occupies: tstzrangeLiteral(chosenStart, slot.end),
+          playWindow: tstzrangeLiteral(chosenStart, addMinutes(chosenStart, estimate.playMin)),
+        })),
+      );
+
+      return created;
+    });
+  } catch (err) {
+    // Someone else took it between the check above and the insert -- report it as
+    // unavailable, don't retry with a different time the customer never picked.
+    if (isExclusionViolation(err)) throw new NoAvailabilityError();
+    throw err;
+  }
 }
 
 /** Releases every lane this booking held. Freed time becomes bookable immediately --

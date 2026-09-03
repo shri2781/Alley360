@@ -24,6 +24,9 @@ export type LaneBoardEntry = {
   current?: {
     bookingId: string;
     customerName: string | null;
+    /** Where this booking came from -- used to pick an honest fallback label when
+     *  customerName is empty. A blank-name online booking is not a walk-in. */
+    source: "walkin" | "phone" | "staff" | "web";
     partySize: number;
     /** The scheduled start, not necessarily the literal actual clock-in moment --
      *  close enough for a display, and avoids a second join to `session` for M4. */
@@ -33,6 +36,7 @@ export type LaneBoardEntry = {
   nextBooking?: {
     bookingId: string;
     customerName: string | null;
+    source: "walkin" | "phone" | "staff" | "web";
     partySize: number;
     start: Date;
   };
@@ -44,6 +48,7 @@ export type UpcomingBooking = {
   kind: "open_play" | "block";
   laneNumbers: number[];
   customerName: string | null;
+  source: "walkin" | "phone" | "staff" | "web";
   partySize: number;
   games: number;
   start: Date;
@@ -108,6 +113,7 @@ export async function getLaneBoard(venueId: string): Promise<LaneBoardData> {
         current: {
           bookingId: current.booking.id,
           customerName: current.booking.customerName,
+          source: current.booking.source,
           partySize: current.booking.partySize,
           startedAt: playWindow.start,
           expectedFinish: playWindow.end,
@@ -131,6 +137,7 @@ export async function getLaneBoard(venueId: string): Promise<LaneBoardData> {
         nextBooking: {
           bookingId: next.booking.id,
           customerName: next.booking.customerName,
+          source: next.booking.source,
           partySize: next.booking.partySize,
           start: next.occ.start,
         },
@@ -180,6 +187,7 @@ export async function getLaneBoard(venueId: string): Promise<LaneBoardData> {
       kind: u.booking.kind,
       laneNumbers: u.laneNumbers.sort((a, b) => a - b),
       customerName: u.booking.customerName,
+      source: u.booking.source,
       partySize: u.booking.partySize,
       games: u.booking.games,
       start: u.start,

@@ -18,7 +18,7 @@ CREATE EXTENSION IF NOT EXISTS btree_gist;
 -- custom datatypes
 CREATE TYPE booking_kind       AS ENUM ('open_play', 'block');
 CREATE TYPE booking_status     AS ENUM ('confirmed', 'active', 'completed', 'cancelled', 'no_show');
-CREATE TYPE booking_source     AS ENUM ('walkin', 'phone', 'staff');
+CREATE TYPE booking_source     AS ENUM ('walkin', 'phone', 'staff', 'web');
 CREATE TYPE allocation_status  AS ENUM ('confirmed', 'active', 'released');
 CREATE TYPE session_end_reason AS ENUM ('normal', 'staff_ended', 'abandoned');
 
@@ -51,6 +51,30 @@ CREATE TABLE lane (
 
   CONSTRAINT lane_number_positive UNIQUE (tenant_id, number)
 );
+
+-- ---------------------------------------------------------------------------
+-- package — display-only pricing tiers for the customer-facing site. Prices are
+-- shown as "pay at venue" estimates; nothing here touches payments or the
+-- scheduler. `booking.games` (not this table) stays the source of truth once a
+-- booking exists — a package just supplies a starting `games` value in the UI.
+-- Deliberately minimal: no booking_id/package_id link, no price snapshotting.
+-- Real pricing logic is future work; this exists so the admin side has
+-- somewhere to edit tiers instead of them being hardcoded HTML.
+-- ---------------------------------------------------------------------------
+CREATE TABLE package (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id         uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  name              text NOT NULL,
+  games             int  NOT NULL,
+  price_per_person  int  NOT NULL,   -- smallest currency unit's whole number, e.g. rupees
+  sort_order        int  NOT NULL DEFAULT 0,
+  is_active         boolean NOT NULL DEFAULT true,
+
+  CONSTRAINT package_games_positive CHECK (games > 0),
+  CONSTRAINT package_price_nonnegative CHECK (price_per_person >= 0)
+);
+
+CREATE INDEX package_tenant_idx ON package (tenant_id, is_active, sort_order);
 
 -- ---------------------------------------------------------------------------
 -- booking — the commercial agreement. Deliberately also models maintenance:

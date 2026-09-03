@@ -3,7 +3,7 @@
  * for demos is a separate `demo:seed` script in M7.
  */
 import { db, sql } from "./client";
-import { lane, tenant } from "./schema";
+import { lane, pkg, tenant } from "./schema";
 
 /** Placeholder venue settings. Set VENUE_TIMEZONE, or change these for the real alley. */
 const VENUE_NAME = process.env.VENUE_NAME ?? "Demo Bowling Alley";
@@ -34,7 +34,15 @@ export async function seed() {
     })),
   );
 
-  console.log(`seeded "${venue.name}" (${VENUE_TIMEZONE}) with ${LANE_COUNT} lanes`);
+  // Display-only pricing tiers -- "pay at venue," not wired to any payment logic.
+  // Games count feeds the booking form; price is shown as an estimate only.
+  await db.insert(pkg).values([
+    { tenantId: venue.id, name: "Basic Bowl", games: 1, pricePerPerson: 299, sortOrder: 1 },
+    { tenantId: venue.id, name: "Strike Special", games: 2, pricePerPerson: 499, sortOrder: 2 },
+    { tenantId: venue.id, name: "Ultimate Fun", games: 3, pricePerPerson: 699, sortOrder: 3 },
+  ]);
+
+  console.log(`seeded "${venue.name}" (${VENUE_TIMEZONE}) with ${LANE_COUNT} lanes and 3 packages`);
   return venue;
 }
 

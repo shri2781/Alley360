@@ -1,0 +1,33 @@
+/**
+ * Dark, neon-accented theme for the customer-facing site — deliberately distinct from
+ * the staff dashboard's clean/light look. Scoped to `.root` (not `:root`) so it only
+ * affects this subtree; the staff pages never see these values, and vice versa.
+ */
+.root {
+  --bg: #0d0817;
+  --surface: #171126;
+  --surface-raised: #1e1730;
+  --border: #2f2647;
+  --text: #f5f3fa;
+  --text-muted: #a89bc4;
+
+  --accent: #ec1561;
+  --accent-2: #ff5f9e;
+  --accent-gradient: linear-gradient(135deg, #ec1561, #a855f7);
+
+  --state-available-bg: #0f2e22;
+  --state-available-border: #1e6b4c;
+  --state-available-text: #4ade80;
+
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+}

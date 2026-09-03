@@ -172,6 +172,34 @@ function scoreCandidate(
   return preferenceCost + cfg.orphanGapWeight * orphanCount - cfg.perfectFitWeight * perfectFitCount;
 }
 
+export type SlotCheck = { end: Date; laneIds: string[] } | null;
+
+/**
+ * Checks feasibility of exactly ONE start time — no enumeration, no ranking, no
+ * substitution. Used to re-confirm a slot a customer already picked from a candidate
+ * list: findCandidates() might legitimately return a DIFFERENT "best" time if state has
+ * shifted since the list was shown, and silently booking that instead of what the
+ * customer actually clicked would be a real bug, not a helpful fallback. This returns
+ * null rather than ever picking something else.
+ */
+export function checkSlot(
+  snapshot: ScheduleSnapshot,
+  start: Date,
+  request: Pick<BookingRequest, "players" | "games">,
+  estimatorCfg: EstimatorConfig = DEFAULT_ESTIMATOR_CONFIG,
+): SlotCheck {
+  const estimate = estimateDuration(request.players, request.games, estimatorCfg);
+  const end = addMinutes(start, estimate.occupyMin);
+
+  if (start < snapshot.openAt || end > snapshot.closeAt) return null;
+
+  const free = freeLaneNumbers(snapshot, start, end);
+  const block = findContiguousBlock(free, estimate.lanesNeeded);
+  if (!block) return null;
+
+  return { end, laneIds: laneIdsForNumbers(snapshot.lanes, block) };
+}
+
 /**
  * The public entry point. Given today's schedule and a request, returns up to
  * `cfg.maxCandidates` feasible start times, best (lowest score) first.
