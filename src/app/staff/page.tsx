@@ -3,9 +3,15 @@ import { tenant } from "../../db/schema";
 import { AutoRefresh } from "../../components/AutoRefresh";
 import { getTimeline } from "../../server/timeline";
 import { TimelineChart } from "./TimelineChart";
+import { AddWalkInButton } from "./AddWalkInButton";
 import styles from "./timeline.module.css";
 
-export default async function LaneAllotmentPage() {
+export default async function LaneAllotmentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
   const [venue] = await db.select().from(tenant).limit(1);
 
   if (!venue) {
@@ -22,8 +28,11 @@ export default async function LaneAllotmentPage() {
     <>
       <AutoRefresh />
       <div className={styles.header}>
-        <h1 className={styles.title}>Lane Allotment</h1>
-        <p className={styles.subtitle}>{data.venueName} &middot; live from now through closing</p>
+        <div>
+          <h1 className={styles.title}>Lane Allotment</h1>
+          <p className={styles.subtitle}>{data.venueName} &middot; live from now through closing</p>
+        </div>
+        <AddWalkInButton error={error} />
       </div>
 
       <div className={styles.statsRow}>

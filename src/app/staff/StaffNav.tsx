@@ -7,7 +7,6 @@ import styles from "./staff-layout.module.css";
 const LINKS = [
   { href: "/staff", label: "Lane Allotment" },
   { href: "/staff/bookings", label: "Bookings" },
-  { href: "/staff/walk-ins", label: "Walk-ins" },
   { href: "/staff/settings", label: "Settings" },
 ];
 
