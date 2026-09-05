@@ -18,7 +18,6 @@ export async function seed() {
     .values({
       name: VENUE_NAME,
       timezone: VENUE_TIMEZONE,
-      dayRolloverHour: 4,
       opensAtHour: OPENS_AT_HOUR,
       closesAtHour: CLOSES_AT_HOUR,
     })

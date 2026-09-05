@@ -3,13 +3,39 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, max } from "drizzle-orm";
 import { db } from "../../../db/client";
-import { lane, pkg } from "../../../db/schema";
+import { lane, pkg, tenant } from "../../../db/schema";
 import { getVenue } from "../../../server/venue";
 
 function revalidateSettings() {
   revalidatePath("/staff/settings");
   revalidatePath("/"); // packages shown on the customer landing page
   revalidatePath("/book");
+  revalidatePath("/staff"); // timeline window depends on venue hours
+  revalidatePath("/staff/bookings");
+}
+
+export async function updateVenueHours(formData: FormData) {
+  const opensAtHour = Number(formData.get("opensAtHour"));
+  const closesRaw = Number(formData.get("closesAtHour"));
+
+  const inputValid =
+    Number.isInteger(opensAtHour) &&
+    opensAtHour >= 0 &&
+    opensAtHour <= 23 &&
+    Number.isInteger(closesRaw) &&
+    closesRaw >= 0 &&
+    closesRaw <= 23;
+
+  if (!inputValid) return;
+
+  // A closing hour earlier on the clock than opening means the alley runs past
+  // midnight -- e.g. opens 10, closes 4 is a 10am-4am alley, stored as closes_at_hour
+  // = 28. Equal hours means open the full 24.
+  const closesAtHour = closesRaw <= opensAtHour ? closesRaw + 24 : closesRaw;
+
+  const venue = await getVenue();
+  await db.update(tenant).set({ opensAtHour, closesAtHour }).where(eq(tenant.id, venue.id));
+  revalidateSettings();
 }
 
 export async function updatePackage(packageId: string, formData: FormData) {

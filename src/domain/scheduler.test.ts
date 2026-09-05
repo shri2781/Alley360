@@ -4,6 +4,8 @@ import { checkSlot, findCandidates, type Allocation, type Lane, type ScheduleSna
 
 const DAY = "2026-09-12";
 const t = (hm: string) => new Date(`${DAY}T${hm}:00.000Z`);
+const NEXT_DAY = "2026-09-13";
+const tNext = (hm: string) => new Date(`${NEXT_DAY}T${hm}:00.000Z`);
 
 const LANES: Lane[] = [
   { id: "L1", number: 1 },
@@ -58,6 +60,19 @@ describe("empty schedule", () => {
     const nearClose = findCandidates(snapshot([]), { ...FOUR_BY_TWO, preferredStart: t("21:30") });
     for (const c of nearClose) {
       expect(c.end.getTime()).toBeLessThanOrEqual(t("22:00").getTime());
+    }
+  });
+
+  it("supports a close time on the following calendar day", () => {
+    // Alley opens 10:00 and closes 4:00 the next morning (closes_at_hour = 28) --
+    // the scheduler only ever sees openAt/closeAt as plain Dates, so a request in the
+    // small hours must be offered exactly like any other time inside the window.
+    const snap = snapshot([], t("10:00"), tNext("04:00"));
+    const result = findCandidates(snap, { ...FOUR_BY_TWO, preferredStart: tNext("01:00") });
+    expect(result.length).toBeGreaterThan(0);
+    expect(result[0]!.start).toEqual(tNext("01:00"));
+    for (const c of result) {
+      expect(c.end.getTime()).toBeLessThanOrEqual(tNext("04:00").getTime());
     }
   });
 });

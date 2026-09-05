@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/client";
 import { booking, lane, laneAllocation, tenant } from "../db/schema";
-import { businessDate } from "../domain/time";
+import { businessDate, rolloverHour } from "../domain/time";
 import { displayName } from "./labels";
 
 export type BookingRow = {
@@ -22,7 +22,7 @@ export async function getBookingsToday(venueId: string): Promise<BookingRow[]> {
   const [venueRow] = await db.select().from(tenant).where(eq(tenant.id, venueId));
   if (!venueRow) throw new Error(`venue ${venueId} not found`);
 
-  const today = businessDate(new Date(), venueRow.timezone, venueRow.dayRolloverHour);
+  const today = businessDate(new Date(), venueRow.timezone, rolloverHour(venueRow.closesAtHour));
 
   const rows = await db
     .select({ booking, laneNumber: lane.number })

@@ -30,13 +30,12 @@ CREATE TABLE tenant (
   id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name               text        NOT NULL,
   timezone           text        NOT NULL,              -- IANA, e.g. 'Asia/Kolkata'
-  day_rollover_hour  int         NOT NULL DEFAULT 4,    -- a 00:30 session belongs to the previous business day
   opens_at_hour      int         NOT NULL DEFAULT 10,   -- venue-local hour bookings can start from
-  closes_at_hour     int         NOT NULL DEFAULT 22,   -- venue-local hour after which no new bookings occupy a lane
+  closes_at_hour     int         NOT NULL DEFAULT 22,   -- hours since midnight of the opening day: a 4am close is 28
   created_at         timestamptz NOT NULL DEFAULT now(),
 
-  CONSTRAINT tenant_rollover_valid CHECK (day_rollover_hour BETWEEN 0 AND 12),
-  CONSTRAINT tenant_hours_valid CHECK (opens_at_hour >= 0 AND closes_at_hour <= 24 AND opens_at_hour < closes_at_hour)
+  CONSTRAINT tenant_hours_valid CHECK (opens_at_hour BETWEEN 0 AND 23
+    AND closes_at_hour > opens_at_hour AND closes_at_hour <= opens_at_hour + 24)
 );
 
 -- ---------------------------------------------------------------------------
@@ -95,7 +94,7 @@ CREATE TABLE booking (
   party_size            int NOT NULL DEFAULT 0,
   games                 int NOT NULL DEFAULT 0,
 
-  business_date         date        NOT NULL,   -- venue day, derived via day_rollover_hour
+  business_date         date        NOT NULL,   -- venue day, derived from closing hour (see rolloverHour in src/domain/time.ts)
   scheduled_start       timestamptz NOT NULL,
 
   -- The three duration quantities are distinct on purpose (see src/domain/config.ts):

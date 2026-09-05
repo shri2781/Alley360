@@ -16,7 +16,7 @@ import { db, sql } from "../src/db/client.js";
 import { tstzrangeLiteral } from "../src/db/range.js";
 import { booking, lane, laneAllocation, tenant } from "../src/db/schema.js";
 import { DEFAULT_ESTIMATOR_CONFIG } from "../src/domain/config.js";
-import { addMinutes, businessDate } from "../src/domain/time.js";
+import { addMinutes, businessDate, rolloverHour as deriveRolloverHour } from "../src/domain/time.js";
 
 const PG_EXCLUSION_VIOLATION = "23P01";
 
@@ -87,7 +87,7 @@ async function main() {
   const laneTwo = lanes[1];
   if (!laneOne || !laneTwo) throw new Error("expected at least 2 lanes");
 
-  const ctx = { tenantId: venue.id, timezone: venue.timezone, rolloverHour: venue.dayRolloverHour };
+  const ctx = { tenantId: venue.id, timezone: venue.timezone, rolloverHour: deriveRolloverHour(venue.closesAtHour) };
 
   // 18:00 UTC on a fixed future date, so the run is deterministic.
   const start = new Date("2026-09-12T18:00:00.000Z");

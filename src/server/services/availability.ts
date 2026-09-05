@@ -20,13 +20,12 @@ import {
   type Lane as SchedulerLane,
   type ScheduleSnapshot,
 } from "../../domain/scheduler";
-import { businessDate, zonedInstant } from "../../domain/time";
+import { businessDate, rolloverHour, zonedInstant } from "../../domain/time";
 
 /** The subset of a `tenant` row the scheduling code actually needs. */
 export type Venue = {
   id: string;
   timezone: string;
-  dayRolloverHour: number;
   opensAtHour: number;
   closesAtHour: number;
 };
@@ -78,7 +77,7 @@ export async function getAvailability(
   schedulerCfg: SchedulerConfig = DEFAULT_SCHEDULER_CONFIG,
   estimatorCfg: EstimatorConfig = DEFAULT_ESTIMATOR_CONFIG,
 ): Promise<Candidate[]> {
-  const bDate = businessDate(request.preferredStart, venue.timezone, venue.dayRolloverHour);
+  const bDate = businessDate(request.preferredStart, venue.timezone, rolloverHour(venue.closesAtHour));
   const snapshot = await loadSnapshot(venue, bDate);
   // Never offer a start that's already passed -- a preferred time near "now" would
   // otherwise pull in candidates from earlier in the candidate window (see M3's

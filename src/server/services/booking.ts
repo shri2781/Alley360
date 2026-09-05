@@ -9,7 +9,7 @@ import { booking, laneAllocation } from "../../db/schema";
 import { DEFAULT_ESTIMATOR_CONFIG, DEFAULT_SCHEDULER_CONFIG } from "../../domain/config";
 import { estimateDuration } from "../../domain/estimator";
 import { checkSlot } from "../../domain/scheduler";
-import { addMinutes, businessDate } from "../../domain/time";
+import { addMinutes, businessDate, rolloverHour } from "../../domain/time";
 import { getAvailability, loadSnapshot, type AvailabilityRequest, type Venue } from "./availability";
 
 const PG_EXCLUSION_VIOLATION = "23P01";
@@ -74,7 +74,7 @@ export async function createBooking(venue: Venue, input: CreateBookingInput) {
             customerPhone: input.customerPhone,
             partySize: input.players,
             games: input.games,
-            businessDate: businessDate(best.start, venue.timezone, venue.dayRolloverHour),
+            businessDate: businessDate(best.start, venue.timezone, rolloverHour(venue.closesAtHour)),
             scheduledStart: best.start,
             estimatedBaseMin: estimate.baseMin,
             estimatedPlayMin: estimate.playMin,
@@ -116,7 +116,7 @@ export async function createBooking(venue: Venue, input: CreateBookingInput) {
  */
 export async function bookSpecificSlot(venue: Venue, input: CreateBookingInput, chosenStart: Date) {
   const estimatorCfg = DEFAULT_ESTIMATOR_CONFIG;
-  const bDate = businessDate(chosenStart, venue.timezone, venue.dayRolloverHour);
+  const bDate = businessDate(chosenStart, venue.timezone, rolloverHour(venue.closesAtHour));
 
   const snapshot = await loadSnapshot(venue, bDate);
   const slot = checkSlot(snapshot, chosenStart, input, estimatorCfg, new Date());
@@ -196,7 +196,7 @@ export async function blockLane(venue: Venue, laneId: string, from: Date, to: Da
         kind: "block",
         status: "confirmed",
         source: "staff",
-        businessDate: businessDate(from, venue.timezone, venue.dayRolloverHour),
+        businessDate: businessDate(from, venue.timezone, rolloverHour(venue.closesAtHour)),
         scheduledStart: from,
         notes: reason,
       })
