@@ -119,7 +119,7 @@ export async function bookSpecificSlot(venue: Venue, input: CreateBookingInput, 
   const bDate = businessDate(chosenStart, venue.timezone, venue.dayRolloverHour);
 
   const snapshot = await loadSnapshot(venue, bDate);
-  const slot = checkSlot(snapshot, chosenStart, input, estimatorCfg);
+  const slot = checkSlot(snapshot, chosenStart, input, estimatorCfg, new Date());
   if (!slot) throw new NoAvailabilityError();
 
   const estimate = estimateDuration(input.players, input.games, estimatorCfg);

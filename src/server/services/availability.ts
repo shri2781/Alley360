@@ -80,5 +80,8 @@ export async function getAvailability(
 ): Promise<Candidate[]> {
   const bDate = businessDate(request.preferredStart, venue.timezone, venue.dayRolloverHour);
   const snapshot = await loadSnapshot(venue, bDate);
-  return findCandidates(snapshot, request, schedulerCfg, estimatorCfg);
+  // Never offer a start that's already passed -- a preferred time near "now" would
+  // otherwise pull in candidates from earlier in the candidate window (see M3's
+  // scheduler.ts: it centers purely on preferredStart, blind to the clock).
+  return findCandidates(snapshot, request, schedulerCfg, estimatorCfg, new Date());
 }

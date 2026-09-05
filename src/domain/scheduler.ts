@@ -187,10 +187,12 @@ export function checkSlot(
   start: Date,
   request: Pick<BookingRequest, "players" | "games">,
   estimatorCfg: EstimatorConfig = DEFAULT_ESTIMATOR_CONFIG,
+  now?: Date,
 ): SlotCheck {
   const estimate = estimateDuration(request.players, request.games, estimatorCfg);
   const end = addMinutes(start, estimate.occupyMin);
 
+  if (now && start < now) return null;
   if (start < snapshot.openAt || end > snapshot.closeAt) return null;
 
   const free = freeLaneNumbers(snapshot, start, end);
@@ -209,6 +211,7 @@ export function findCandidates(
   request: BookingRequest,
   schedulerCfg: SchedulerConfig = DEFAULT_SCHEDULER_CONFIG,
   estimatorCfg: EstimatorConfig = DEFAULT_ESTIMATOR_CONFIG,
+  now?: Date,
 ): Candidate[] {
   const estimate = estimateDuration(request.players, request.games, estimatorCfg);
   const grid = estimatorCfg.slotGridMin;
@@ -222,6 +225,7 @@ export function findCandidates(
     const start = addMinutes(center, i * grid);
     const end = addMinutes(start, estimate.occupyMin);
 
+    if (now && start < now) continue;
     if (start < snapshot.openAt || end > snapshot.closeAt) continue;
 
     const free = freeLaneNumbers(snapshot, start, end);

@@ -121,6 +121,30 @@ describe("multi-lane requests need a contiguous block", () => {
   });
 });
 
+describe("now -- never offers or confirms a start that has already passed", () => {
+  it("findCandidates excludes starts before now, even if they're within the preference window", () => {
+    // Preferred 20:00, but it's already 19:55 -- 19:30/19:45 are grid-aligned and
+    // would otherwise be feasible, closest-to-preferred candidates. They must not
+    // appear: their start already happened.
+    const result = findCandidates(snapshot([]), { ...FOUR_BY_TWO, preferredStart: t("20:00") }, undefined, undefined, t("19:55"));
+    for (const c of result) {
+      expect(c.start.getTime()).toBeGreaterThanOrEqual(t("19:55").getTime());
+    }
+    expect(result.some((c) => c.start.getTime() === t("19:30").getTime())).toBe(false);
+    expect(result.some((c) => c.start.getTime() === t("19:45").getTime())).toBe(false);
+  });
+
+  it("checkSlot rejects an exact start that has already passed", () => {
+    const result = checkSlot(snapshot([]), t("19:30"), FOUR_BY_TWO, undefined, t("19:55"));
+    expect(result).toBeNull();
+  });
+
+  it("checkSlot still confirms a future start when now is given", () => {
+    const result = checkSlot(snapshot([]), t("20:00"), FOUR_BY_TWO, undefined, t("19:55"));
+    expect(result).not.toBeNull();
+  });
+});
+
 describe("checkSlot -- validates one exact time, never substitutes another", () => {
   it("confirms a feasible slot and returns its lane(s) and end time", () => {
     const result = checkSlot(snapshot([]), t("14:00"), FOUR_BY_TWO);
