@@ -18,7 +18,7 @@ const PG_EXCLUSION_VIOLATION = "23P01";
  * Drizzle wraps the real Postgres error inside `err.cause` -- the code lives there,
  * not on the wrapper. Same detail that tripped up prove-constraint.ts's first draft.
  */
-function isExclusionViolation(err: unknown): boolean {
+export function isExclusionViolation(err: unknown): boolean {
   const code = (err as { code?: string } | undefined)?.code;
   const causeCode = (err as { cause?: { code?: string } } | undefined)?.cause?.code;
   return code === PG_EXCLUSION_VIOLATION || causeCode === PG_EXCLUSION_VIOLATION;

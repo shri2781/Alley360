@@ -2,6 +2,12 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import {
+  moveAllocation,
+  moveFailureMessage,
+  MoveRejectedError,
+  type MoveAllocationInput,
+} from "../../server/services/allocation";
 import { createBooking, NoAvailabilityError } from "../../server/services/booking";
 import { startSession } from "../../server/services/session";
 import { getVenue } from "../../server/venue";
@@ -41,4 +47,29 @@ export async function addWalkIn(formData: FormData) {
   revalidatePath("/staff/bookings");
   revalidatePath("/staff");
   redirect("/staff");
+}
+
+/**
+ * Staff dragged a block on the timeline. Returns a result rather than throwing: the
+ * caller is a pointer handler, not a <form>, so there is no error boundary to catch a
+ * throw and nothing sensible to redirect to mid-drag. Anything that isn't a rejection
+ * we understand still throws, so real bugs stay loud.
+ */
+export async function moveAllocationAction(
+  input: MoveAllocationInput,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const venue = await getVenue();
+
+  try {
+    await moveAllocation(venue, input);
+  } catch (err) {
+    if (err instanceof MoveRejectedError) {
+      return { ok: false, message: moveFailureMessage(err.reason) };
+    }
+    throw err;
+  }
+
+  revalidatePath("/staff");
+  revalidatePath("/staff/bookings");
+  return { ok: true };
 }

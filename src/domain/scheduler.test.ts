@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_ESTIMATOR_CONFIG, DEFAULT_SCHEDULER_CONFIG } from "./config";
-import { checkSlot, findCandidates, type Allocation, type Lane, type ScheduleSnapshot } from "./scheduler";
+import { checkMove, checkSlot, findCandidates, type Allocation, type Lane, type ScheduleSnapshot } from "./scheduler";
 
 const DAY = "2026-09-12";
 const t = (hm: string) => new Date(`${DAY}T${hm}:00.000Z`);
@@ -196,5 +196,142 @@ describe("checkSlot -- validates one exact time, never substitutes another", () 
 
     const direct = checkSlot(snap, t("13:15"), FOUR_BY_TWO);
     expect(direct).not.toBeNull();
+  });
+});
+
+describe("checkMove -- validates a staff drag/resize of an existing allocation", () => {
+  it("excludes the allocation being moved from its own overlap check", () => {
+    // The whole point: nudging A by 15 minutes must not have A collide with itself.
+    const snap = snapshot([{ id: "A", laneId: "L1", start: t("14:00"), end: t("16:00") }]);
+    const result = checkMove(snap, {
+      allocationId: "A",
+      laneId: "L1",
+      start: t("14:15"),
+      end: t("16:15"),
+      hasTurnover: true,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects a move into a different, occupied allocation on the target lane", () => {
+    const snap = snapshot([
+      { id: "A", laneId: "L1", start: t("14:00"), end: t("16:00") },
+      { id: "B", laneId: "L2", start: t("15:00"), end: t("17:00") },
+    ]);
+    const result = checkMove(snap, {
+      allocationId: "A",
+      laneId: "L2",
+      start: t("14:00"),
+      end: t("16:00"),
+      hasTurnover: true,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("lane_conflict");
+      expect(result.conflicts.map((c) => c.id)).toEqual(["B"]);
+    }
+  });
+
+  it("allows a move onto a free lane", () => {
+    const snap = snapshot([{ id: "A", laneId: "L1", start: t("14:00"), end: t("16:00") }]);
+    const result = checkMove(snap, {
+      allocationId: "A",
+      laneId: "L3",
+      start: t("14:00"),
+      end: t("16:00"),
+      hasTurnover: true,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("allows two allocations that merely touch -- half-open ranges don't overlap", () => {
+    const snap = snapshot([{ id: "A", laneId: "L1", start: t("14:00"), end: t("16:00") }]);
+    const result = checkMove(snap, {
+      allocationId: "B",
+      laneId: "L1",
+      start: t("16:00"),
+      end: t("17:00"),
+      hasTurnover: true,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects a play block shrunk below the minimum span", () => {
+    const snap = snapshot([{ id: "A", laneId: "L1", start: t("14:00"), end: t("14:20") }]);
+    const result = checkMove(snap, {
+      allocationId: "A",
+      laneId: "L1",
+      start: t("14:00"),
+      end: t("14:20"), // 20 min, below minPlayBlockMin (30)
+      hasTurnover: true,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("too_short");
+  });
+
+  it("allows a maintenance block at its own smaller minimum, with no turnover subtracted", () => {
+    const snap = snapshot([]);
+    const result = checkMove(snap, {
+      allocationId: "A",
+      laneId: "L1",
+      start: t("14:00"),
+      end: t("14:15"), // 15 min -- fine for hasTurnover:false, would fail for true
+      hasTurnover: false,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.playEnd).toEqual(t("14:15"));
+  });
+
+  it("rejects a drag that would end after closing", () => {
+    const snap = snapshot([]);
+    const result = checkMove(snap, {
+      allocationId: "A",
+      laneId: "L1",
+      start: t("21:30"),
+      end: t("22:15"),
+      hasTurnover: true,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("after_close");
+  });
+
+  it("rejects any change to a locked (active-session) start", () => {
+    const snap = snapshot([{ id: "A", laneId: "L1", start: t("14:00"), end: t("16:00") }]);
+    const result = checkMove(snap, {
+      allocationId: "A",
+      laneId: "L1",
+      start: t("14:15"), // moved -- not allowed once locked
+      end: t("16:00"),
+      hasTurnover: true,
+      locked: { start: t("14:00"), laneId: "L1" },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("locked_start");
+  });
+
+  it("allows extending the end of a locked (active-session) allocation", () => {
+    const snap = snapshot([{ id: "A", laneId: "L1", start: t("14:00"), end: t("16:00") }]);
+    const result = checkMove(snap, {
+      allocationId: "A",
+      laneId: "L1",
+      start: t("14:00"),
+      end: t("16:30"), // running long -- end may still move
+      hasTurnover: true,
+      locked: { start: t("14:00"), laneId: "L1" },
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("computes playEnd as end minus turnoverMin when hasTurnover is true", () => {
+    const snap = snapshot([]);
+    const result = checkMove(snap, {
+      allocationId: "A",
+      laneId: "L1",
+      start: t("14:00"),
+      end: t("16:00"),
+      hasTurnover: true,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.playEnd).toEqual(t("15:50")); // turnoverMin default 10
   });
 });

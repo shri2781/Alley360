@@ -52,6 +52,14 @@ export type EstimatorConfig = {
   bufferMultiplier: number;
   /** All starts and durations snap to this grid. */
   slotGridMin: number;
+  /** Smallest allowed occupies span for a staff-dragged open_play allocation. Below
+   *  this, play_window (occupies minus turnoverMin) would be too thin to mean anything,
+   *  or empty outright -- occupies must exceed turnoverMin, and two grid cells is the
+   *  smallest span that leaves a sane play window. */
+  minPlayBlockMin: number;
+  /** Smallest allowed span for a maintenance allocation (kind: 'block'), which has no
+   *  turnover component, so it only needs one grid cell. */
+  minMaintenanceBlockMin: number;
 };
 
 export const DEFAULT_ESTIMATOR_CONFIG: EstimatorConfig = {
@@ -62,6 +70,8 @@ export const DEFAULT_ESTIMATOR_CONFIG: EstimatorConfig = {
   maxPlayersPerLane: 6,
   bufferMultiplier: 1.15,
   slotGridMin: 15,
+  minPlayBlockMin: 30,
+  minMaintenanceBlockMin: 15,
 };
 
 /**
