@@ -22,13 +22,16 @@ export async function addWalkIn(formData: FormData) {
 
   const players = Number(formData.get("players"));
   const games = Number(formData.get("games"));
-  const customerName = String(formData.get("customerName") ?? "").trim() || undefined;
+  const customerName = String(formData.get("customerName") ?? "").trim();
 
   if (!Number.isInteger(players) || players < 1) {
     redirect("/staff?error=" + encodeURIComponent("Enter a valid number of players."));
   }
   if (!Number.isInteger(games) || games < 1) {
     redirect("/staff?error=" + encodeURIComponent("Enter a valid number of games."));
+  }
+  if (!customerName) {
+    redirect("/staff?error=" + encodeURIComponent("Enter the customer's name."));
   }
 
   const venue = await getVenue();

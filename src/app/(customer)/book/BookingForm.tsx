@@ -65,8 +65,21 @@ export function BookingForm({ packages }: { packages: PackageOption[] }) {
     }
   }
 
+  const trimmedName = customerName.trim();
+  const trimmedPhone = customerPhone.trim();
+  const nameValid = trimmedName.length > 0;
+  const phoneValid = /^\d{10}$/.test(trimmedPhone);
+
   async function handleConfirm() {
     if (!selectedTimeIso) return;
+    if (!nameValid) {
+      setErrorMsg("Name is required.");
+      return;
+    }
+    if (!phoneValid) {
+      setErrorMsg("Enter a valid 10-digit phone number.");
+      return;
+    }
     setSubmitting(true);
     setErrorMsg(null);
     try {
@@ -74,8 +87,8 @@ export function BookingForm({ packages }: { packages: PackageOption[] }) {
         players,
         games,
         startIso: selectedTimeIso,
-        customerName: customerName.trim() || undefined,
-        customerPhone: customerPhone.trim() || undefined,
+        customerName: trimmedName,
+        customerPhone: trimmedPhone,
       });
       if (result.ok) {
         router.push(`/book/confirmed?id=${result.bookingId}`);
@@ -242,21 +255,26 @@ export function BookingForm({ packages }: { packages: PackageOption[] }) {
           <div className={styles.section}>
             <h2 className={styles.sectionTitle}>3. Your Details</h2>
             <label className={styles.field}>
-              Name (optional)
+              Name
               <input
                 type="text"
                 className={styles.input}
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
+                required
               />
             </label>
             <label className={styles.field}>
-              Phone (optional)
+              Phone
               <input
                 type="tel"
+                inputMode="numeric"
+                pattern="\d{10}"
+                maxLength={10}
                 className={styles.input}
                 value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
+                onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                required
               />
             </label>
 
@@ -270,7 +288,7 @@ export function BookingForm({ packages }: { packages: PackageOption[] }) {
               type="button"
               className={`${btn.btnPrimary} ${btn.btnBlock}`}
               onClick={handleConfirm}
-              disabled={submitting}
+              disabled={submitting || !nameValid || !phoneValid}
             >
               {submitting ? "Booking…" : "Confirm Booking"}
             </button>

@@ -50,15 +50,27 @@ export type ConfirmBookingInput = {
   players: number;
   games: number;
   startIso: string;
-  customerName?: string;
-  customerPhone?: string;
+  customerName: string;
+  customerPhone: string;
 };
 
 export type ConfirmResult = { ok: true; bookingId: string } | { ok: false; message: string };
 
+const PHONE_PATTERN = /^\d{10}$/;
+
 /** Books the EXACT slot the customer picked from findTimes()'s results -- see
  *  bookSpecificSlot()'s own comment for why this never substitutes a different time. */
 export async function confirmBooking(input: ConfirmBookingInput): Promise<ConfirmResult> {
+  const customerName = input.customerName.trim();
+  const customerPhone = input.customerPhone.trim();
+
+  if (!customerName) {
+    return { ok: false, message: "Name is required." };
+  }
+  if (!PHONE_PATTERN.test(customerPhone)) {
+    return { ok: false, message: "Enter a valid 10-digit phone number." };
+  }
+
   const venue = await getVenue();
 
   try {
@@ -69,8 +81,8 @@ export async function confirmBooking(input: ConfirmBookingInput): Promise<Confir
         games: input.games,
         preferredStart: new Date(input.startIso),
         source: "web",
-        customerName: input.customerName,
-        customerPhone: input.customerPhone,
+        customerName,
+        customerPhone,
       },
       new Date(input.startIso),
     );

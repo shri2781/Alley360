@@ -34,8 +34,8 @@ export function AddWalkInButton({ error }: { error?: string }) {
                 <input type="number" name="games" min={1} max={5} defaultValue={2} required className={styles.input} />
               </label>
               <label className={styles.field}>
-                Name (optional)
-                <input type="text" name="customerName" className={styles.input} />
+                Name
+                <input type="text" name="customerName" required className={styles.input} />
               </label>
 
               <div className={styles.actions}>
