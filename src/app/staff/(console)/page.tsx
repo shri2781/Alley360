@@ -44,14 +44,6 @@ export default async function LaneAllotmentPage({
           <div className={styles.statLabel}>Active Now</div>
           <div className={styles.statValue}>{data.stats.activeSessions}</div>
         </div>
-        <div className={styles.statCard}>
-          <div className={styles.statLabel}>Upcoming Blocks</div>
-          <div className={styles.statValue}>{data.stats.upcomingBlocks}</div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statLabel}>Walk-ins Today</div>
-          <div className={styles.statValue}>{data.stats.walkinsToday}</div>
-        </div>
       </div>
 
       <TimelineChart data={data} />

@@ -56,8 +56,6 @@ export type TimelineData = {
   stats: {
     totalLanes: number;
     activeSessions: number;
-    upcomingBlocks: number;
-    walkinsToday: number;
   };
 };
 
@@ -96,18 +94,12 @@ export async function getTimeline(venueId: string): Promise<TimelineData> {
 
   const blocks: TimelineBlock[] = [];
   let activeSessions = 0;
-  let upcomingBlocks = 0;
-  const walkinBookingIds = new Set<string>();
 
   for (const r of rows) {
     const occ = parseTstzrange(r.allocation.occupies);
     const play = parseTstzrange(r.allocation.playWindow);
 
     if (occ.start <= now && now < occ.end) activeSessions += 1;
-    if (r.booking.kind === "block" && occ.start > now) upcomingBlocks += 1;
-    if (r.booking.source === "walkin" && r.booking.businessDate === bDateStr) {
-      walkinBookingIds.add(r.booking.id);
-    }
 
     // Skip anything entirely outside the visible window.
     if (occ.end <= windowStart || occ.start >= windowEnd) continue;
@@ -146,8 +138,6 @@ export async function getTimeline(venueId: string): Promise<TimelineData> {
     stats: {
       totalLanes: lanes.length,
       activeSessions,
-      upcomingBlocks,
-      walkinsToday: walkinBookingIds.size,
     },
   };
 }
