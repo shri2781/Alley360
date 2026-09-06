@@ -1,14 +1,29 @@
 import Link from "next/link";
+import { DEFAULT_ESTIMATOR_CONFIG } from "../../domain/config";
+import { estimateDuration } from "../../domain/estimator";
 import { getActivePackages } from "../../server/packages";
+import { getActiveLaneCount } from "../../server/lanes";
 import { getVenue } from "../../server/venue";
+import { PhotoCard } from "./_components/PhotoCard";
+import { Reveal } from "./_components/Reveal";
+import btn from "./_components/Button.module.css";
+import { formatHour, formatMinutes } from "./format";
 import styles from "./landing.module.css";
 
-function formatHour(hour: number): string {
-  const h = hour % 24;
-  const period = h < 12 ? "AM" : "PM";
-  const display = h % 12 === 0 ? 12 : h % 12;
-  return `${display} ${period}`;
-}
+import heroPhoto from "../../assets/photos/hero-alley.jpg";
+import laneDarkPhoto from "../../assets/photos/lane-dark.jpg";
+import pinsClosePhoto from "../../assets/photos/pins-closeup.jpg";
+import ballReturnPhoto from "../../assets/photos/ball-return.jpg";
+import shoesFloorPhoto from "../../assets/photos/shoes-floor.jpg";
+import friendsChattingPhoto from "../../assets/photos/friends-chatting.jpg";
+import shoesTyingPhoto from "../../assets/photos/shoes-tying.jpg";
+import manBallPhoto from "../../assets/photos/man-ball.jpg";
+import pinsDownLanePhoto from "../../assets/photos/pins-down-lane.jpg";
+import friendsHappyPhoto from "../../assets/photos/friends-happy.jpg";
+import friendsFourPhoto from "../../assets/photos/friends-four.jpg";
+import friendsPlayingPhoto from "../../assets/photos/friends-playing.jpg";
+import alleyMoodyPhoto from "../../assets/photos/alley-moody.jpg";
+import ballMotionPhoto from "../../assets/photos/ball-motion.jpg";
 
 const FAQS = [
   {
@@ -27,177 +42,192 @@ const FAQS = [
     q: "What if I need to cancel?",
     a: "Just give us a call. There's no charge for cancelling ahead of your booked time.",
   },
+  {
+    q: "Do I pick my own lane?",
+    a: "No need -- a lane is assigned automatically the moment you book, based on what's actually free.",
+  },
+  {
+    q: "How do I pay?",
+    a: "Pay at the venue when you arrive. No payment is taken online.",
+  },
+];
+
+const GALLERY = [
+  { src: friendsHappyPhoto, alt: "A group of friends laughing together at the alley" },
+  { src: friendsFourPhoto, alt: "Four friends posing with bowling balls" },
+  { src: friendsPlayingPhoto, alt: "Friends playing a game of bowling" },
+  { src: ballMotionPhoto, alt: "A bowling ball in motion under neon lights" },
+  { src: alleyMoodyPhoto, alt: "Dimly lit bowling alley with vivid lane lighting" },
 ];
 
 export default async function LandingPage() {
   const venue = await getVenue();
-  const packages = await getActivePackages(venue.id);
-  const hours = `${formatHour(venue.opensAtHour)} - ${formatHour(venue.closesAtHour)}`;
+  const [packages, laneCount] = await Promise.all([
+    getActivePackages(venue.id),
+    getActiveLaneCount(venue.id),
+  ]);
+  const hours = `${formatHour(venue.opensAtHour)} – ${formatHour(venue.closesAtHour)}`;
+
+  const stats = [
+    { photo: laneDarkPhoto, value: String(laneCount), label: laneCount === 1 ? "Bowling Lane" : "Bowling Lanes" },
+    { photo: pinsClosePhoto, value: `Up to ${DEFAULT_ESTIMATOR_CONFIG.maxPlayersPerLane}`, label: "Players per Lane" },
+    { photo: ballReturnPhoto, value: String(packages.length), label: packages.length === 1 ? "Package" : "Packages" },
+    { photo: shoesFloorPhoto, value: hours, label: "Open Daily" },
+  ];
 
   return (
     <div>
-      <header className={styles.nav}>
-        <span className={styles.logo}>{venue.name}</span>
-
-        <ul className={styles.navLinksDesktop}>
-          <li>
-            <a href="#home">Home</a>
-          </li>
-          <li>
-            <a href="#packages">Packages</a>
-          </li>
-          <li>
-            <a href="#about">About</a>
-          </li>
-          <li>
-            <a href="#faq">FAQ</a>
-          </li>
-          <li>
-            <a href="#contact">Contact</a>
-          </li>
-        </ul>
-        <Link href="/book" className={styles.navCta}>
-          Book Now
-        </Link>
-
-        <input type="checkbox" id="nav-toggle" className={styles.navToggle} />
-        <label htmlFor="nav-toggle" className={styles.navToggleLabel} aria-label="Menu">
-          &#9776;
-        </label>
-        <ul className={styles.navMobileMenu}>
-          <li>
-            <a href="#home">Home</a>
-          </li>
-          <li>
-            <a href="#packages">Packages</a>
-          </li>
-          <li>
-            <a href="#about">About</a>
-          </li>
-          <li>
-            <a href="#faq">FAQ</a>
-          </li>
-          <li>
-            <a href="#contact">Contact</a>
-          </li>
-          <li>
-            <Link href="/book">Book Now</Link>
-          </li>
-        </ul>
-      </header>
-
       <section id="home" className={styles.hero}>
-        <div className={styles.heroKicker}>Roll &bull; Play &bull; Party</div>
-        <h1 className={styles.heroTitle}>
-          The Ultimate <span className={styles.heroTitleAccent}>Bowling Experience</span>
-        </h1>
-        <p className={styles.heroSubtitle}>Good vibes. Great games. Unforgettable moments.</p>
-        <Link href="/book" className={styles.heroCta}>
-          Book Your Session &rsaquo;
-        </Link>
+        <PhotoCard
+          src={heroPhoto}
+          alt="Wide view of a bowling lane and pins under vivid neon lighting"
+          fillParent
+          sizes="100vw"
+          priority
+          className={styles.heroPhoto}
+        />
+        <div className={styles.heroScrim} />
+        <div className={styles.heroContent}>
+          <span className={styles.heroPill}>Open today · {hours}</span>
+          <div className={styles.heroKicker}>Roll &bull; Play &bull; Party</div>
+          <h1 className={styles.heroTitle}>
+            The Ultimate <span className={styles.heroTitleAccent}>Bowling Experience</span>
+          </h1>
+          <p className={styles.heroSubtitle}>Good vibes. Great games. Unforgettable moments.</p>
+          <div className={styles.heroActions}>
+            <Link href="/book" className={btn.btnPrimary}>
+              Book a Lane
+            </Link>
+            <a href="#packages" className={btn.btnGhost}>
+              See Packages
+            </a>
+          </div>
+        </div>
       </section>
 
-      <div className={styles.statsBar}>
-        <div className={styles.statCard}>
-          <div className={styles.statValue}>4</div>
-          <div className={styles.statLabel}>Bowling Lanes</div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statValue}>&#128106;</div>
-          <div className={styles.statLabel}>Family Friendly</div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statValue}>&#127860;</div>
-          <div className={styles.statLabel}>Food &amp; Beverages</div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statValue}>&#127881;</div>
-          <div className={styles.statLabel}>Events &amp; Parties</div>
-        </div>
-      </div>
+      <Reveal as="section" className={styles.statsBar}>
+        {stats.map((s) => (
+          <div key={s.label} className={styles.statCard}>
+            <PhotoCard src={s.photo} alt="" aspect="1 / 1" sizes="120px" className={styles.statPhoto} />
+            <div className={styles.statBody}>
+              <div className={styles.statValue}>{s.value}</div>
+              <div className={styles.statLabel}>{s.label}</div>
+            </div>
+          </div>
+        ))}
+      </Reveal>
 
       <section id="packages" className={styles.section}>
-        <div className={styles.sectionHeading}>
-          <h2 className={styles.sectionTitle}>Our Packages</h2>
-          <p className={styles.sectionSubtitle}>Choose from our flexible packages for every kind of bowler</p>
-        </div>
+        <Reveal>
+          <div className={styles.sectionHeading}>
+            <h2 className={styles.sectionTitle}>Our Packages</h2>
+            <p className={styles.sectionSubtitle}>Choose from our flexible packages for every kind of bowler</p>
+          </div>
+        </Reveal>
 
         <div className={styles.packageGrid}>
           {packages.map((p, i) => {
-            const featured = i === 1;
+            const featured = packages.length > 2 && i === Math.floor(packages.length / 2);
+            const est = estimateDuration(4, p.games);
             return (
-              <div key={p.id} className={`${styles.packageCard} ${featured ? styles.packageCardFeatured : ""}`}>
-                {featured && <span className={styles.packageBadge}>Most Popular</span>}
-                <span className={styles.packageName}>{p.name}</span>
-                <span className={styles.packageGames}>
-                  {p.games} game{p.games === 1 ? "" : "s"}
-                </span>
-                <div className={styles.packagePrice}>
-                  &#8377;{p.pricePerPerson} <span className={styles.packagePriceUnit}>/ person</span>
+              <Reveal key={p.id} delayMs={i * 60}>
+                <div className={`${styles.packageCard} ${featured ? styles.packageCardFeatured : ""}`}>
+                  {featured && <span className={styles.packageBadge}>Most Popular</span>}
+                  <span className={styles.packageName}>{p.name}</span>
+                  <span className={styles.packageGames}>
+                    {p.games} game{p.games === 1 ? "" : "s"}
+                  </span>
+                  <div className={styles.packagePrice}>
+                    &#8377;{p.pricePerPerson} <span className={styles.packagePriceUnit}>/ person</span>
+                  </div>
+                  <p className={styles.packageMeta}>~{formatMinutes(est.playMin)} of lane time for 4 players</p>
+                  <Link href="/book" className={`${btn.btnPrimary} ${btn.btnBlock}`}>
+                    Book Now
+                  </Link>
                 </div>
-                <Link href="/book" className={styles.packageCta}>
-                  Book Now
-                </Link>
-              </div>
+              </Reveal>
             );
           })}
         </div>
       </section>
 
-      <section id="about" className={styles.section}>
-        <div className={styles.sectionHeading}>
-          <h2 className={styles.sectionTitle}>More Than Bowling</h2>
-          <p className={styles.sectionSubtitle}>
-            Enjoy a complete entertainment experience with food, drinks, and great company
-          </p>
-        </div>
+      <section id="how-it-works" className={styles.section}>
+        <Reveal>
+          <div className={styles.sectionHeading}>
+            <h2 className={styles.sectionTitle}>How It Works</h2>
+            <p className={styles.sectionSubtitle}>Three steps, and your lane is waiting</p>
+          </div>
+        </Reveal>
 
-        <div className={styles.amenitiesGrid}>
-          <div className={styles.amenityCard}>
-            <div className={styles.amenityIcon}>&#127860;</div>
-            <div className={styles.amenityLabel}>Food &amp; Drinks</div>
-          </div>
-          <div className={styles.amenityCard}>
-            <div className={styles.amenityIcon}>&#127882;</div>
-            <div className={styles.amenityLabel}>Party Packages</div>
-          </div>
-          <div className={styles.amenityCard}>
-            <div className={styles.amenityIcon}>&#127942;</div>
-            <div className={styles.amenityLabel}>Corporate Events</div>
-          </div>
-          <div className={styles.amenityCard}>
-            <div className={styles.amenityIcon}>&#127775;</div>
-            <div className={styles.amenityLabel}>Great Vibes</div>
-          </div>
-        </div>
-      </section>
-
-      <section id="faq" className={styles.section}>
-        <div className={styles.sectionHeading}>
-          <h2 className={styles.sectionTitle}>Frequently Asked Questions</h2>
-        </div>
-
-        <div className={styles.faqList}>
-          {FAQS.map((f) => (
-            <div key={f.q} className={styles.faqItem}>
-              <p className={styles.faqQuestion}>{f.q}</p>
-              <p className={styles.faqAnswer}>{f.a}</p>
-            </div>
+        <div className={styles.stepsGrid}>
+          {[
+            { photo: shoesTyingPhoto, alt: "A person lacing up their bowling shoes", title: "Pick players & package", body: "Tell us how many are playing and choose a package -- we'll work out how much lane time you need." },
+            { photo: manBallPhoto, alt: "A man holding a red bowling ball, ready to play", title: "Choose a real time", body: "We search live availability and show you up to five times that are actually free -- no guessing, no double-booking." },
+            { photo: pinsDownLanePhoto, alt: "View down a lane toward a full rack of pins", title: "Show up & play", body: "Your lane is assigned automatically. Arrive a few minutes early for shoes and you're set." },
+          ].map((step, i) => (
+            <Reveal key={step.title} delayMs={i * 80}>
+              <div className={styles.stepCard}>
+                <PhotoCard src={step.photo} alt={step.alt} aspect="4 / 3" />
+                <span className={styles.stepNumber}>{i + 1}</span>
+                <h3 className={styles.stepTitle}>{step.title}</h3>
+                <p className={styles.stepBody}>{step.body}</p>
+              </div>
+            </Reveal>
           ))}
         </div>
       </section>
 
-      <footer id="contact" className={styles.footer}>
-        <div className={styles.footerInner}>
-          <div className={styles.footerInfo}>
-            <span>{venue.name}</span>
-            <span>Open Daily &middot; {hours}</span>
+      <section id="about" className={styles.section}>
+        <Reveal>
+          <div className={styles.sectionHeading}>
+            <h2 className={styles.sectionTitle}>Why Bowl Here</h2>
+            <p className={styles.sectionSubtitle}>Built around getting you playing, not waiting</p>
           </div>
-          <Link href="/book" className={styles.footerCta}>
-            Book Your Lane &rsaquo;
-          </Link>
+        </Reveal>
+
+        <div className={styles.amenitiesGrid}>
+          {[
+            { icon: "⚡", label: "Instant lane assignment" },
+            { icon: "👥", label: "Big groups split across adjacent lanes" },
+            { icon: "🔒", label: "Double-booking is physically impossible" },
+            { icon: "🚶", label: "Walk-ins always welcome" },
+          ].map((a) => (
+            <Reveal key={a.label}>
+              <div className={styles.amenityCard}>
+                <div className={styles.amenityIcon} aria-hidden="true">
+                  {a.icon}
+                </div>
+                <div className={styles.amenityLabel}>{a.label}</div>
+              </div>
+            </Reveal>
+          ))}
         </div>
-      </footer>
+      </section>
+
+      <Reveal as="section" className={styles.gallerySection} aria-label="Photos from the alley">
+        <div className={styles.galleryTrack}>
+          {[...GALLERY, ...GALLERY].map((g, i) => (
+            <PhotoCard key={i} src={g.src} alt={g.alt} aspect="3 / 4" className={styles.galleryTile} sizes="280px" />
+          ))}
+        </div>
+      </Reveal>
+
+      <section id="faq" className={styles.section}>
+        <Reveal>
+          <div className={styles.sectionHeading}>
+            <h2 className={styles.sectionTitle}>Frequently Asked Questions</h2>
+          </div>
+        </Reveal>
+
+        <Reveal className={styles.faqList}>
+          {FAQS.map((f) => (
+            <details key={f.q} className={styles.faqItem}>
+              <summary className={styles.faqQuestion}>{f.q}</summary>
+              <p className={styles.faqAnswer}>{f.a}</p>
+            </details>
+          ))}
+        </Reveal>
+      </section>
     </div>
   );
 }

@@ -1,0 +1,85 @@
+/* Shared CTA styles for the customer site. Previously every page redefined its own
+ * button classes (landing.module.css and book.module.css each had their own
+ * near-identical rules) -- this is the one place a button's look is decided. */
+
+.btnPrimary,
+.btnGhost,
+.btnPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  font-weight: 700;
+  font-size: 1rem;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease,
+    opacity 0.15s ease;
+  min-height: 44px;
+  padding: 0 var(--sp-6);
+}
+
+.btnPrimary,
+.btnPill {
+  border-radius: var(--r-pill);
+}
+
+.btnGhost {
+  border-radius: var(--r-pill);
+}
+
+.btnPrimary {
+  background: var(--accent-gradient);
+  color: #fff;
+  box-shadow: var(--shadow-1);
+}
+
+.btnPrimary:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-2);
+}
+
+.btnPrimary:active {
+  transform: translateY(0);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btnGhost {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+}
+
+.btnGhost:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--accent-2);
+}
+
+.btnPill {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  min-height: 36px;
+  padding: 0 var(--sp-4);
+  font-size: 0.875rem;
+}
+
+.btnPill:hover {
+  color: var(--text);
+  border-color: var(--accent-2);
+}
+
+.btnBlock {
+  width: 100%;
+}

@@ -1,0 +1,82 @@
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--sp-10) var(--gutter) var(--sp-16);
+}
+
+.photo {
+  margin-bottom: var(--sp-6);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-8) var(--sp-6);
+  text-align: center;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--state-available-bg);
+  border: 1px solid var(--state-available-border);
+  color: var(--state-available-text);
+  font-size: 1.6rem;
+  margin-bottom: var(--sp-4);
+}
+
+.title {
+  font-family: var(--font-display, inherit);
+  font-weight: 400;
+  text-transform: uppercase;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  margin: 0 0 var(--sp-1);
+}
+
+.reference {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  margin: 0 0 var(--sp-6);
+}
+
+.details {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: var(--sp-5) 0;
+  margin-bottom: var(--sp-5);
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.detailRow strong {
+  color: var(--text);
+  text-align: right;
+}
+
+.note {
+  color: var(--text-muted);
+  margin: 0 0 var(--sp-6);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-3);
+}
