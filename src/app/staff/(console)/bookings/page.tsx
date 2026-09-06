@@ -1,5 +1,5 @@
-import { getBookingsToday } from "../../../server/bookingsList";
-import { getVenue } from "../../../server/venue";
+import { getBookingsToday } from "../../../../server/bookingsList";
+import { getVenue } from "../../../../server/venue";
 import { cancelBookingAction, endBookingAction, startBookingAction } from "./actions";
 import styles from "./bookings.module.css";
 

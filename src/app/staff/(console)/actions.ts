@@ -7,14 +7,19 @@ import {
   moveFailureMessage,
   MoveRejectedError,
   type MoveAllocationInput,
-} from "../../server/services/allocation";
-import { createBooking, NoAvailabilityError } from "../../server/services/booking";
-import { startSession } from "../../server/services/session";
-import { getVenue } from "../../server/venue";
+} from "../../../server/services/allocation";
+import { createBooking, NoAvailabilityError } from "../../../server/services/booking";
+import { startSession } from "../../../server/services/session";
+import { getVenue } from "../../../server/venue";
+import { getStaffUser, requireStaff } from "../../../server/auth/dal";
 
 /** A walk-in is bowling now -- create the booking and start its session in one step,
  *  matching the counter flow: party arrives, staff enter size, they start playing. */
 export async function addWalkIn(formData: FormData) {
+  // The real boundary -- see the comment on StaffLayout for why the page gate
+  // alone isn't enough. redirect()'s throw is fine here; it's outside any try.
+  await requireStaff();
+
   const players = Number(formData.get("players"));
   const games = Number(formData.get("games"));
   const customerName = String(formData.get("customerName") ?? "").trim() || undefined;
@@ -58,6 +63,13 @@ export async function addWalkIn(formData: FormData) {
 export async function moveAllocationAction(
   input: MoveAllocationInput,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  // getStaffUser(), not requireStaff(): this is an RPC from a pointer handler
+  // mid-drag, not a <form> -- there's no error boundary to catch a redirect's
+  // throw, so an expired session must come back as a typed failure instead.
+  if (!(await getStaffUser())) {
+    return { ok: false, message: "Session expired. Please sign in again." };
+  }
+
   const venue = await getVenue();
 
   try {

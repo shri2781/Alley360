@@ -4,6 +4,35 @@
   margin: 0 0 20px;
 }
 
+.errorBanner {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--state-overrun-text);
+  background: var(--state-overrun-bg);
+  border: 1px solid var(--state-overrun-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 0 16px;
+}
+
+.successBanner {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--state-available-text);
+  background: var(--state-available-bg);
+  border: 1px solid var(--state-available-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0 0 16px;
+}
+
+.passwordForm {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
 .section {
   background: var(--surface);
   border: 1px solid var(--border);

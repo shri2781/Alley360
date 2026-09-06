@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { acquireRefreshPause } from "../../components/refreshGate";
-import { DEFAULT_ESTIMATOR_CONFIG } from "../../domain/config";
-import { checkMove, roundToGrid, type ScheduleSnapshot } from "../../domain/scheduler";
-import { addMinutes } from "../../domain/time";
-import type { TimelineBlock, TimelineData } from "../../server/timeline";
+import { acquireRefreshPause } from "../../../components/refreshGate";
+import { DEFAULT_ESTIMATOR_CONFIG } from "../../../domain/config";
+import { checkMove, roundToGrid, type ScheduleSnapshot } from "../../../domain/scheduler";
+import { addMinutes } from "../../../domain/time";
+import type { TimelineBlock, TimelineData } from "../../../server/timeline";
 import { moveAllocationAction } from "./actions";
 import styles from "./timeline.module.css";
 

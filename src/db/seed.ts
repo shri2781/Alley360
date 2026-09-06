@@ -3,7 +3,8 @@
  * for demos is a separate `demo:seed` script in M7.
  */
 import { db, sql } from "./client";
-import { lane, pkg, tenant } from "./schema";
+import { lane, pkg, staffUser, tenant } from "./schema";
+import { hashPassword } from "../server/auth/password";
 
 /** Placeholder venue settings. Set VENUE_TIMEZONE, or change these for the real alley. */
 const VENUE_NAME = process.env.VENUE_NAME ?? "Alley360";
@@ -11,6 +12,11 @@ const VENUE_TIMEZONE = process.env.VENUE_TIMEZONE ?? "Asia/Kolkata";
 const LANE_COUNT = Number(process.env.VENUE_LANE_COUNT ?? 4);
 const OPENS_AT_HOUR = Number(process.env.VENUE_OPENS_AT_HOUR ?? 10);
 const CLOSES_AT_HOUR = Number(process.env.VENUE_CLOSES_AT_HOUR ?? 22);
+
+/** The one shared staff login. Change the password from /staff/settings after
+ *  the first login against anything but your own machine. */
+const STAFF_USERNAME = process.env.STAFF_USERNAME ?? "staff";
+const STAFF_PASSWORD = process.env.STAFF_PASSWORD ?? "change-me";
 
 export async function seed() {
   const [venue] = await db
@@ -41,7 +47,19 @@ export async function seed() {
     { tenantId: venue.id, name: "Ultimate Fun", games: 3, pricePerPerson: 699, sortOrder: 3 },
   ]);
 
-  console.log(`seeded "${venue.name}" (${VENUE_TIMEZONE}) with ${LANE_COUNT} lanes and 3 packages`);
+  await db.insert(staffUser).values({
+    tenantId: venue.id,
+    username: STAFF_USERNAME,
+    passwordHash: await hashPassword(STAFF_PASSWORD),
+  });
+  if (STAFF_PASSWORD === "change-me") {
+    console.warn(
+      `WARNING: staff login "${STAFF_USERNAME}" was seeded with the default password. ` +
+        "Change it from /staff/settings before using this anywhere but your own machine.",
+    );
+  }
+
+  console.log(`seeded "${venue.name}" (${VENUE_TIMEZONE}) with ${LANE_COUNT} lanes, 3 packages, and 1 staff login`);
   return venue;
 }
 

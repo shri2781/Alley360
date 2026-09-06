@@ -196,3 +196,24 @@ CREATE TABLE session (
 
 CREATE INDEX session_booking_idx ON session (booking_id);
 CREATE INDEX session_tenant_idx  ON session (tenant_id, started_at);
+
+-- ---------------------------------------------------------------------------
+-- staff_user — who may open the console at /staff.
+--
+-- One row is the expected case for a single alley: everyone on shift shares it.
+-- It is a table rather than a passcode in .env so the password is stored hashed
+-- rather than readable in a file, and can be changed from Settings without a
+-- redeploy. A second login later is an INSERT, not an auth rewrite.
+--
+-- Deliberately no actor tracking: booking rows do not record who created them.
+-- ---------------------------------------------------------------------------
+CREATE TABLE staff_user (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id      uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  username       text NOT NULL,
+  password_hash  text NOT NULL,
+  is_active      boolean NOT NULL DEFAULT true,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+
+  CONSTRAINT staff_user_username_unique UNIQUE (tenant_id, username)
+);

@@ -1,0 +1,92 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px 24px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0 0 2px;
+  text-align: center;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 24px;
+  text-align: center;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.input {
+  font: inherit;
+  padding: 9px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  width: 100%;
+}
+
+.input:focus-visible {
+  outline: none;
+  border-color: var(--state-playing-text);
+}
+
+.errorNote {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--state-overrun-text);
+  background: var(--state-overrun-bg);
+  border: 1px solid var(--state-overrun-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.submitBtn {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.submitBtn:hover:not(:disabled) {
+  border-color: var(--state-playing-text);
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

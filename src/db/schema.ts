@@ -170,3 +170,22 @@ export const session = pgTable(
     tenantIdx: index("session_tenant_idx").on(t.tenantId, t.startedAt),
   }),
 );
+
+/** Who may open /staff. See the banner comment in schema.sql -- one shared row is
+ *  the expected case; the table shape just means a second login is an INSERT. */
+export const staffUser = pgTable(
+  "staff_user",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenant.id, { onDelete: "cascade" }),
+    username: text("username").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    usernameUnique: unique("staff_user_username_unique").on(t.tenantId, t.username),
+  }),
+);

@@ -1,10 +1,13 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { and, eq, max } from "drizzle-orm";
-import { db } from "../../../db/client";
-import { lane, pkg, tenant } from "../../../db/schema";
-import { getVenue } from "../../../server/venue";
+import { db } from "../../../../db/client";
+import { lane, pkg, staffUser, tenant } from "../../../../db/schema";
+import { getVenue } from "../../../../server/venue";
+import { requireStaff } from "../../../../server/auth/dal";
+import { hashPassword, verifyPassword } from "../../../../server/auth/password";
 
 function revalidateSettings() {
   revalidatePath("/staff/settings");
@@ -15,6 +18,8 @@ function revalidateSettings() {
 }
 
 export async function updateVenueHours(formData: FormData) {
+  await requireStaff();
+
   const opensAtHour = Number(formData.get("opensAtHour"));
   const closesRaw = Number(formData.get("closesAtHour"));
 
@@ -39,6 +44,8 @@ export async function updateVenueHours(formData: FormData) {
 }
 
 export async function updatePackage(packageId: string, formData: FormData) {
+  await requireStaff();
+
   const name = String(formData.get("name") ?? "").trim();
   const games = Number(formData.get("games"));
   const pricePerPerson = Number(formData.get("pricePerPerson"));
@@ -52,11 +59,14 @@ export async function updatePackage(packageId: string, formData: FormData) {
 }
 
 export async function togglePackageActive(packageId: string, currentlyActive: boolean) {
+  await requireStaff();
   await db.update(pkg).set({ isActive: !currentlyActive }).where(eq(pkg.id, packageId));
   revalidateSettings();
 }
 
 export async function addPackage(formData: FormData) {
+  await requireStaff();
+
   const name = String(formData.get("name") ?? "").trim();
   const games = Number(formData.get("games"));
   const pricePerPerson = Number(formData.get("pricePerPerson"));
@@ -82,11 +92,14 @@ export async function addPackage(formData: FormData) {
 }
 
 export async function toggleLaneActive(laneId: string, currentlyActive: boolean) {
+  await requireStaff();
   await db.update(lane).set({ isActive: !currentlyActive }).where(eq(lane.id, laneId));
   revalidateSettings();
 }
 
 export async function addLane() {
+  await requireStaff();
+
   const venue = await getVenue();
   const [row] = await db
     .select({ maxNumber: max(lane.number) })
@@ -99,4 +112,33 @@ export async function addLane() {
     displayName: `Lane ${(row?.maxNumber ?? 0) + 1}`,
   });
   revalidateSettings();
+}
+
+/** Errors redirect back with ?error=... (matching addWalkIn's convention, the one
+ *  other place in the console that surfaces a failure) rather than silently
+ *  no-opping like the settings actions above -- a failed password change needs
+ *  to be visible, since it's the one action here with real security stakes. */
+export async function changePassword(formData: FormData) {
+  const user = await requireStaff();
+
+  const currentPassword = String(formData.get("currentPassword") ?? "");
+  const newPassword = String(formData.get("newPassword") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  const fail = (message: string) => redirect("/staff/settings?error=" + encodeURIComponent(message));
+
+  if (newPassword.length < 8) {
+    fail("New password must be at least 8 characters.");
+  }
+  if (newPassword !== confirmPassword) {
+    fail("New password and confirmation don't match.");
+  }
+
+  const [row] = await db.select().from(staffUser).where(eq(staffUser.id, user.id));
+  if (!row || !(await verifyPassword(currentPassword, row.passwordHash))) {
+    fail("Current password is incorrect.");
+  }
+
+  await db.update(staffUser).set({ passwordHash: await hashPassword(newPassword) }).where(eq(staffUser.id, user.id));
+  redirect("/staff/settings?success=" + encodeURIComponent("Password updated."));
 }

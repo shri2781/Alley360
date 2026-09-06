@@ -1,7 +1,7 @@
-import { db } from "../../db/client";
-import { tenant } from "../../db/schema";
-import { AutoRefresh } from "../../components/AutoRefresh";
-import { getTimeline } from "../../server/timeline";
+import { db } from "../../../db/client";
+import { tenant } from "../../../db/schema";
+import { AutoRefresh } from "../../../components/AutoRefresh";
+import { getTimeline } from "../../../server/timeline";
 import { TimelineChart } from "./TimelineChart";
 import { AddWalkInButton } from "./AddWalkInButton";
 import styles from "./timeline.module.css";

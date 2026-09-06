@@ -1,10 +1,11 @@
 import { asc, eq } from "drizzle-orm";
-import { db } from "../../../db/client";
-import { lane, pkg } from "../../../db/schema";
-import { getVenue } from "../../../server/venue";
+import { db } from "../../../../db/client";
+import { lane, pkg } from "../../../../db/schema";
+import { getVenue } from "../../../../server/venue";
 import {
   addLane,
   addPackage,
+  changePassword,
   toggleLaneActive,
   togglePackageActive,
   updatePackage,
@@ -24,7 +25,12 @@ function formatHour(hour: number): string {
 const OPEN_HOURS = Array.from({ length: 24 }, (_, h) => h); // 0-23
 const CLOSE_HOURS = Array.from({ length: 24 }, (_, h) => h); // 0-23; a value <= Opens At means next day
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; success?: string }>;
+}) {
+  const { error, success } = await searchParams;
   const venue = await getVenue();
 
   const packages = await db.select().from(pkg).where(eq(pkg.tenantId, venue.id)).orderBy(asc(pkg.sortOrder));
@@ -33,6 +39,9 @@ export default async function SettingsPage() {
   return (
     <div>
       <h1 className={styles.title}>Settings</h1>
+
+      {error && <p className={styles.errorBanner}>{error}</p>}
+      {success && <p className={styles.successBanner}>{success}</p>}
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Alley Timings</h2>
@@ -141,6 +150,46 @@ export default async function SettingsPage() {
             </button>
           </form>
         </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Account</h2>
+        <p className={styles.sectionSubtitle}>
+          The shared login everyone on shift uses to open this console. Changing it signs out anyone still using
+          the old password next time their session expires -- it does not sign out other tabs immediately.
+        </p>
+
+        <form action={changePassword} className={styles.passwordForm}>
+          <label className={styles.hoursField}>
+            Current password
+            <input type="password" name="currentPassword" autoComplete="current-password" required className={styles.input} />
+          </label>
+          <label className={styles.hoursField}>
+            New password
+            <input
+              type="password"
+              name="newPassword"
+              autoComplete="new-password"
+              minLength={8}
+              required
+              className={styles.input}
+            />
+          </label>
+          <label className={styles.hoursField}>
+            Confirm new password
+            <input
+              type="password"
+              name="confirmPassword"
+              autoComplete="new-password"
+              minLength={8}
+              required
+              className={styles.input}
+            />
+          </label>
+          <button type="submit" className={styles.btn}>
+            Update Password
+          </button>
+        </form>
       </section>
     </div>
   );
