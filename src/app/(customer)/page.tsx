@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { DEFAULT_ESTIMATOR_CONFIG } from "../../domain/config";
-import { estimateDuration } from "../../domain/estimator";
 import { getActivePackages } from "../../server/packages";
 import { getActiveLaneCount } from "../../server/lanes";
 import { getVenue } from "../../server/venue";
 import { PhotoCard } from "./_components/PhotoCard";
 import { Reveal } from "./_components/Reveal";
 import btn from "./_components/Button.module.css";
-import { formatHour, formatMinutes } from "./format";
+import { formatHour } from "./format";
 import styles from "./landing.module.css";
 
 import heroPhoto from "../../assets/photos/hero-alley.jpg";
@@ -32,11 +31,11 @@ const FAQS = [
   },
   {
     q: "How is my lane time calculated?",
-    a: "It depends on your player count and number of games -- we estimate a fair amount of time and hold your lane for that window, plus a short changeover after.",
+    a: "It depends on your player count and number of games, we estimate a fair amount of time and hold your lane for that window, plus a short changeover after.",
   },
   {
     q: "Can I book for a large group?",
-    a: "Yes -- larger groups are automatically split across adjacent lanes so everyone plays together.",
+    a: "Yes, larger groups are automatically split across adjacent lanes so everyone plays together.",
   },
   {
     q: "What if I need to cancel?",
@@ -44,7 +43,7 @@ const FAQS = [
   },
   {
     q: "Do I pick my own lane?",
-    a: "No need -- a lane is assigned automatically the moment you book, based on what's actually free.",
+    a: "No need, a lane is assigned automatically the moment you book, based on what's actually free.",
   },
   {
     q: "How do I pay?",
@@ -128,7 +127,6 @@ export default async function LandingPage() {
         <div className={styles.packageGrid}>
           {packages.map((p, i) => {
             const featured = packages.length > 2 && i === Math.floor(packages.length / 2);
-            const est = estimateDuration(4, p.games);
             return (
               <Reveal key={p.id} delayMs={i * 60}>
                 <div className={`${styles.packageCard} ${featured ? styles.packageCardFeatured : ""}`}>
@@ -140,7 +138,6 @@ export default async function LandingPage() {
                   <div className={styles.packagePrice}>
                     &#8377;{p.pricePerPerson} <span className={styles.packagePriceUnit}>/ person</span>
                   </div>
-                  <p className={styles.packageMeta}>~{formatMinutes(est.playMin)} of lane time for 4 players</p>
                   <Link href="/book" className={`${btn.btnPrimary} ${btn.btnBlock}`}>
                     Book Now
                   </Link>
@@ -161,8 +158,8 @@ export default async function LandingPage() {
 
         <div className={styles.stepsGrid}>
           {[
-            { photo: shoesTyingPhoto, alt: "A person lacing up their bowling shoes", title: "Pick players & package", body: "Tell us how many are playing and choose a package -- we'll work out how much lane time you need." },
-            { photo: manBallPhoto, alt: "A man holding a red bowling ball, ready to play", title: "Choose a real time", body: "We search live availability and show you up to five times that are actually free -- no guessing, no double-booking." },
+            { photo: shoesTyingPhoto, alt: "A person lacing up their bowling shoes", title: "Pick players & package", body: "Tell us how many are playing and choose a package, we'll work out how much lane time you need." },
+            { photo: manBallPhoto, alt: "A man holding a red bowling ball, ready to play", title: "Choose a real time", body: "We search live availability and show you up to five times that are actually free, no guessing, no double-booking." },
             { photo: pinsDownLanePhoto, alt: "View down a lane toward a full rack of pins", title: "Show up & play", body: "Your lane is assigned automatically. Arrive a few minutes early for shoes and you're set." },
           ].map((step, i) => (
             <Reveal key={step.title} delayMs={i * 80}>
@@ -189,7 +186,7 @@ export default async function LandingPage() {
           {[
             { icon: "⚡", label: "Instant lane assignment" },
             { icon: "👥", label: "Big groups split across adjacent lanes" },
-            { icon: "🔒", label: "Double-booking is physically impossible" },
+            { icon: "⏱️", label: "Minimal customer wait time" },
             { icon: "🚶", label: "Walk-ins always welcome" },
           ].map((a) => (
             <Reveal key={a.label}>

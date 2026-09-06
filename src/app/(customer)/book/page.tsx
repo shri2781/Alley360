@@ -11,7 +11,7 @@ export default async function BookPage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>Book Your Bowling Session</h1>
-        <p className={styles.subtitle}>Pick your players, package, and a real available time -- takes a minute.</p>
+        <p className={styles.subtitle}>Pick your players, package, and a real available time, takes a minute.</p>
       </div>
 
       <BookingForm

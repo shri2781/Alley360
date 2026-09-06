@@ -21,7 +21,7 @@ export default async function ConfirmedPage({
 
   const [row] = await db.select().from(bookingTable).where(eq(bookingTable.id, id));
   if (!row) {
-    return <EmptyState heading="Booking not found" body="That booking doesn't exist -- it may have been cancelled." />;
+    return <EmptyState heading="Booking not found" body="That booking doesn't exist, it may have been cancelled." />;
   }
 
   const [venue] = await db.select().from(tenant).where(eq(tenant.id, row.tenantId));
