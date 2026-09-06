@@ -8,8 +8,6 @@ function formatHour(hour: number): string {
   return `${display} ${period}`;
 }
 
-/** No address or phone number here -- the schema doesn't hold either, and inventing
- *  them would put a wrong number in front of a customer. Only real fields render. */
 export function SiteFooter({ venueName, opensAtHour, closesAtHour }: { venueName: string; opensAtHour: number; closesAtHour: number }) {
   const hours = `${formatHour(opensAtHour)} – ${formatHour(closesAtHour)}`;
 
@@ -19,6 +17,15 @@ export function SiteFooter({ venueName, opensAtHour, closesAtHour }: { venueName
         <div className={styles.brand}>
           <span className={styles.name}>{venueName}</span>
           <span className={styles.hours}>Open daily · {hours}</span>
+        </div>
+
+        <div className={styles.info}>
+          <a href="https://maps.google.com/?q=Chennai" target="_blank" rel="noopener noreferrer" className={styles.infoLink}>
+            Chennai
+          </a>
+          <a href="tel:+911234567890" className={styles.infoLink}>
+            +91 1234567890
+          </a>
         </div>
 
         <Link href="/book" className={styles.cta}>

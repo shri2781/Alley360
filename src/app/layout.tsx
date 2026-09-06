@@ -20,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const venue = await getVenue();
   return {
     title: {
-      default: `${venue.name} — Book a Bowling Lane`,
+      default: venue.name,
       template: `%s · ${venue.name}`,
     },
     description: `Book a bowling lane at ${venue.name} in seconds. Real availability, no phone calls -- pick your players, your package, and a time that works.`,
