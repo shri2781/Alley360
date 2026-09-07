@@ -4,7 +4,6 @@ import { db } from "../../../../db/client";
 import { booking as bookingTable, tenant } from "../../../../db/schema";
 import btn from "../../_components/Button.module.css";
 import { PhotoCard } from "../../_components/PhotoCard";
-import { AddToCalendarButton } from "./AddToCalendarButton";
 import styles from "./confirmed.module.css";
 import friendsPosingPhoto from "../../../../assets/photos/friends-posing.jpg";
 
@@ -37,7 +36,6 @@ export default async function ConfirmedPage({
       }).format(row.scheduledStart)
     : row.scheduledStart.toISOString();
 
-  const playEnd = new Date(row.scheduledStart.getTime() + row.estimatedPlayMin * 60_000);
   const reference = row.id.slice(0, 8).toUpperCase();
 
   return (
@@ -80,12 +78,6 @@ export default async function ConfirmedPage({
         <p className={styles.note}>We&apos;ll see you then. Arrive a few minutes early for shoes.</p>
 
         <div className={styles.actions}>
-          <AddToCalendarButton
-            venueName={venue?.name ?? "Bowling"}
-            startIso={row.scheduledStart.toISOString()}
-            endIso={playEnd.toISOString()}
-            description={`${row.partySize} players, ${row.games} game(s). Lane assigned automatically.`}
-          />
           <Link href="/" className={btn.btnPrimary}>
             Back to Home
           </Link>
