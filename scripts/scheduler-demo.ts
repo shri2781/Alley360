@@ -42,11 +42,9 @@ const candidates = findCandidates(snapshot, request);
 if (candidates.length === 0) {
   console.log("No feasible times found.");
 } else {
-  console.log("Ranked candidates (best first):");
+  console.log("Candidates (tightest-packing first):");
   candidates.forEach((c, i) => {
     const laneNumbers = c.laneIds.map((id) => lanes.find((l) => l.id === id)?.number).join(", ");
-    console.log(
-      `  ${i + 1}. ${fmt(c.start)}-${fmt(c.end)}  lane(s) ${laneNumbers}  score ${c.score.toFixed(2)}`,
-    );
+    console.log(`  ${i + 1}. ${fmt(c.start)}-${fmt(c.end)}  lane(s) ${laneNumbers}`);
   });
 }

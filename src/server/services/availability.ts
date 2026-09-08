@@ -7,12 +7,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../../db/client";
 import { parseTstzrange } from "../../db/range";
 import { lane, laneAllocation } from "../../db/schema";
-import {
-  DEFAULT_ESTIMATOR_CONFIG,
-  DEFAULT_SCHEDULER_CONFIG,
-  type EstimatorConfig,
-  type SchedulerConfig,
-} from "../../domain/config";
+import { DEFAULT_ESTIMATOR_CONFIG, type EstimatorConfig } from "../../domain/config";
 import {
   findCandidates,
   type Allocation,
@@ -74,13 +69,10 @@ export async function loadSnapshot(venue: Venue, businessDateStr: string): Promi
 export async function getAvailability(
   venue: Venue,
   request: AvailabilityRequest,
-  schedulerCfg: SchedulerConfig = DEFAULT_SCHEDULER_CONFIG,
   estimatorCfg: EstimatorConfig = DEFAULT_ESTIMATOR_CONFIG,
 ): Promise<Candidate[]> {
   const bDate = businessDate(request.preferredStart, venue.timezone, rolloverHour(venue.closesAtHour));
   const snapshot = await loadSnapshot(venue, bDate);
-  // Never offer a start that's already passed -- a preferred time near "now" would
-  // otherwise pull in candidates from earlier in the candidate window (see M3's
-  // scheduler.ts: it centers purely on preferredStart, blind to the clock).
-  return findCandidates(snapshot, request, schedulerCfg, estimatorCfg, new Date());
+  // Never offer a start that's already passed -- the scheduler itself is blind to the clock.
+  return findCandidates(snapshot, request, estimatorCfg, new Date());
 }

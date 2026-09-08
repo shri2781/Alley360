@@ -15,7 +15,6 @@ import { asc, eq } from "drizzle-orm";
 import { db, sql } from "../src/db/client.js";
 import { tstzrangeLiteral } from "../src/db/range.js";
 import { booking, lane, laneAllocation, tenant } from "../src/db/schema.js";
-import { DEFAULT_ESTIMATOR_CONFIG } from "../src/domain/config.js";
 import { addMinutes, businessDate, rolloverHour as deriveRolloverHour } from "../src/domain/time.js";
 
 const PG_EXCLUSION_VIOLATION = "23P01";
@@ -30,8 +29,9 @@ async function allocate(opts: {
   timezone: string;
   rolloverHour: number;
 }) {
+  // occupies == play_window: there is no turnover component any more.
   const playEnd = addMinutes(opts.start, opts.playMin);
-  const occupyEnd = addMinutes(playEnd, DEFAULT_ESTIMATOR_CONFIG.turnoverMin);
+  const occupyEnd = playEnd;
 
   return db.transaction(async (tx) => {
     const [created] = await tx
@@ -43,7 +43,7 @@ async function allocate(opts: {
         businessDate: businessDate(opts.start, opts.timezone, opts.rolloverHour),
         scheduledStart: opts.start,
         estimatedPlayMin: opts.playMin,
-        estimatedOccupyMin: opts.playMin + DEFAULT_ESTIMATOR_CONFIG.turnoverMin,
+        estimatedOccupyMin: opts.playMin,
         notes: opts.label,
       })
       .returning();
@@ -91,8 +91,8 @@ async function main() {
 
   // 18:00 UTC on a fixed future date, so the run is deterministic.
   const start = new Date("2026-09-12T18:00:00.000Z");
-  const playMin = 105; // 4 players x 2 games, per the corrected estimator grid
-  const occupyEnd = addMinutes(start, playMin + DEFAULT_ESTIMATOR_CONFIG.turnoverMin);
+  const playMin = 72; // 4 players x 2 games x 9 min
+  const occupyEnd = addMinutes(start, playMin);
 
   const created: string[] = [];
   let failures = 0;

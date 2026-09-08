@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { DEFAULT_ESTIMATOR_CONFIG } from "../../domain/config";
 import { getActivePackages } from "../../server/packages";
 import { getActiveLaneCount } from "../../server/lanes";
 import { getVenue } from "../../server/venue";
@@ -8,6 +7,10 @@ import { Reveal } from "./_components/Reveal";
 import btn from "./_components/Button.module.css";
 import { formatHour } from "./format";
 import styles from "./landing.module.css";
+
+/** Display copy only. The scheduler no longer splits a party across lanes, so this is
+ *  a fact about the venue rather than an input to any calculation. */
+const MAX_PLAYERS_PER_LANE = 6;
 
 import heroPhoto from "../../assets/photos/hero-alley.jpg";
 import laneDarkPhoto from "../../assets/photos/lane-dark.jpg";
@@ -69,7 +72,7 @@ export default async function LandingPage() {
 
   const stats = [
     { photo: laneDarkPhoto, value: String(laneCount), label: laneCount === 1 ? "Bowling Lane" : "Bowling Lanes" },
-    { photo: pinsClosePhoto, value: `Up to ${DEFAULT_ESTIMATOR_CONFIG.maxPlayersPerLane}`, label: "Players per Lane" },
+    { photo: pinsClosePhoto, value: `Up to ${MAX_PLAYERS_PER_LANE}`, label: "Players per Lane" },
     { photo: ballReturnPhoto, value: String(packages.length), label: packages.length === 1 ? "Package" : "Packages" },
     { photo: shoesFloorPhoto, value: hours, label: "Open Daily" },
   ];

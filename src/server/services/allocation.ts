@@ -66,9 +66,8 @@ export async function moveAllocation(venue: Venue, input: MoveAllocationInput) {
       if (!row) throw new MoveRejectedError("not_found");
       if (row.allocation.status === "released") throw new MoveRejectedError("released");
 
-      // A maintenance block has no turnover component -- blockLane() writes
-      // play_window = occupies for it, and subtracting turnover here would silently
-      // change what the block means.
+      // Only affects which minimum span applies (minPlayBlockMin vs minMaintenanceBlockMin)
+      // -- play_window always equals occupies now, for either kind.
       const hasTurnover = row.booking.kind !== "block";
 
       // No lock: an in-progress session can be moved just like anything else. This

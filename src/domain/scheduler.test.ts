@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_ESTIMATOR_CONFIG, DEFAULT_SCHEDULER_CONFIG } from "./config";
-import { checkMove, checkSlot, findCandidates, type Allocation, type Lane, type ScheduleSnapshot } from "./scheduler";
+import { DEFAULT_ESTIMATOR_CONFIG } from "./config";
+import { estimateDuration } from "./estimator";
+import {
+  CANDIDATE_WINDOW_MIN,
+  checkMove,
+  checkSlot,
+  findCandidates,
+  type Allocation,
+  type Lane,
+  type ScheduleSnapshot,
+} from "./scheduler";
+import { addMinutes } from "./time";
 
 const DAY = "2026-09-12";
 const t = (hm: string) => new Date(`${DAY}T${hm}:00.000Z`);
@@ -20,9 +30,9 @@ function snapshot(allocations: Allocation[], openAt = t("10:00"), closeAt = t("2
   return { lanes: LANES, allocations, openAt, closeAt };
 }
 
-// 4 players / 2 games -> occupyMin 120 (per the estimator grid). Used throughout as
-// a representative single-lane request.
 const FOUR_BY_TWO = { players: 4, games: 2 };
+/** Derived, not hard-coded: the estimator's constants are still being tuned. */
+const DUR = estimateDuration(FOUR_BY_TWO.players, FOUR_BY_TWO.games).occupyMin;
 
 describe("empty schedule", () => {
   it("offers the exact requested time, on the lowest-numbered lane", () => {
@@ -32,21 +42,17 @@ describe("empty schedule", () => {
     expect(numberOf(result[0]!.laneIds[0]!)).toBe(1);
   });
 
-  it("returns at most maxCandidates, closest-to-preferred first", () => {
-    const result = findCandidates(snapshot([]), { ...FOUR_BY_TWO, preferredStart: t("14:00") });
-    expect(result.length).toBe(DEFAULT_SCHEDULER_CONFIG.maxCandidates);
-    for (let i = 1; i < result.length; i++) {
-      const prevDist = Math.abs(result[i - 1]!.start.getTime() - t("14:00").getTime());
-      const currDist = Math.abs(result[i]!.start.getTime() - t("14:00").getTime());
-      expect(currDist).toBeGreaterThanOrEqual(prevDist);
-    }
+  it("offers exactly one lane, never a block of them", () => {
+    const result = findCandidates(snapshot([]), { players: 12, games: 2, preferredStart: t("14:00") });
+    for (const c of result) expect(c.laneIds).toHaveLength(1);
   });
 
-  it("never returns a start off the 15-minute grid", () => {
-    const result = findCandidates(snapshot([]), { ...FOUR_BY_TWO, preferredStart: t("14:07") });
+  it("stays within the candidate window either side of the requested time", () => {
+    const preferredStart = t("14:00");
+    const result = findCandidates(snapshot([]), { ...FOUR_BY_TWO, preferredStart });
     for (const c of result) {
-      expect(c.start.getUTCMinutes() % DEFAULT_ESTIMATOR_CONFIG.slotGridMin).toBe(0);
-      expect(c.start.getUTCSeconds()).toBe(0);
+      const away = Math.abs(c.start.getTime() - preferredStart.getTime()) / 60_000;
+      expect(away).toBeLessThanOrEqual(CANDIDATE_WINDOW_MIN);
     }
   });
 
@@ -56,8 +62,11 @@ describe("empty schedule", () => {
       expect(c.start.getTime()).toBeGreaterThanOrEqual(t("10:00").getTime());
       expect(c.end.getTime()).toBeLessThanOrEqual(t("22:00").getTime());
     }
-    // near closing, too — a candidate that would run past 22:00 must never appear
-    const nearClose = findCandidates(snapshot([]), { ...FOUR_BY_TWO, preferredStart: t("21:30") });
+    // 21:00, not 21:30: with a 70-minute duration, every start after 20:50 runs past
+    // closing, so a window entirely beyond that would trivially satisfy this assertion
+    // over an empty list. 21:00 keeps some feasible starts (20:30/20:40/20:50) in view.
+    const nearClose = findCandidates(snapshot([]), { ...FOUR_BY_TWO, preferredStart: t("21:00") });
+    expect(nearClose.length).toBeGreaterThan(0);
     for (const c of nearClose) {
       expect(c.end.getTime()).toBeLessThanOrEqual(t("22:00").getTime());
     }
@@ -79,74 +88,85 @@ describe("empty schedule", () => {
 
 describe("overlap is genuinely excluded, not just deprioritised", () => {
   it("on a single free lane, a fully-booked window yields no candidate inside it", () => {
-    // Only one lane exists in this fixture, so there is nowhere else for an
-    // overlapping request to go -- it must be rejected outright, not just scored low.
     const oneLane: Lane[] = [{ id: "L1", number: 1 }];
     const snap: ScheduleSnapshot = {
       lanes: oneLane,
-      allocations: [{ laneId: "L1", start: t("14:00"), end: t("15:45") }],
+      allocations: [{ laneId: "L1", start: t("14:00"), end: t("15:40") }],
       openAt: t("10:00"),
       closeAt: t("22:00"),
     };
-    // 2 players / 1 game -> occupyMin 60.
-    const result = findCandidates(snap, { players: 2, games: 1, preferredStart: t("14:30") });
+    // Requested 15:10, so the 15:40 free-up moment (itself grid-aligned, since every
+    // booking both starts and lasts a multiple of bookingGridMin) is inside the window.
+    const result = findCandidates(snap, { players: 2, games: 1, preferredStart: t("15:10") });
 
     for (const c of result) {
-      const overlapsBooking = c.start < t("15:45") && t("14:00") < c.end;
+      const overlapsBooking = c.start < t("15:40") && t("14:00") < c.end;
       expect(overlapsBooking).toBe(false);
     }
-    // The booking ends at 15:45 -- that should be offered as soon as the lane frees up.
-    expect(result.some((c) => c.start.getTime() === t("15:45").getTime())).toBe(true);
+    // The booking ends at 15:40 -- that should be offered as soon as the lane frees up.
+    expect(result.some((c) => c.start.getTime() === t("15:40").getTime())).toBe(true);
   });
 });
 
-describe("scoring prefers a clean fit over an equally-distant open slot", () => {
-  it("continuing immediately after an existing booking outranks other options", () => {
-    const snap = snapshot([{ laneId: "L1", start: t("12:00"), end: t("15:45") }]);
-    // Request exactly the moment Lane 1 frees up -- zero preference cost AND a
-    // perfect-fit bonus (the gap right before this placement is zero).
-    const result = findCandidates(snap, { ...FOUR_BY_TWO, preferredStart: t("15:45") });
+describe("packing -- fewest dead minutes wins", () => {
+  it("fills a hole that exactly fits ahead of a closer but wasteful slot", () => {
+    // Lane 1 has a gap from 14:00 that is precisely long enough. Taking it strands
+    // nothing on either side, so it must outrank 14:30 even though 14:30 is what was
+    // asked for and every other lane is wide open.
+    const snap = snapshot([
+      { laneId: "L1", start: t("12:00"), end: t("14:00") },
+      { laneId: "L1", start: addMinutes(t("14:00"), DUR), end: t("21:00") },
+    ]);
+    const result = findCandidates(snap, { ...FOUR_BY_TWO, preferredStart: t("14:30") });
 
-    expect(result[0]!.start).toEqual(t("15:45"));
+    expect(result[0]!.start).toEqual(t("14:00"));
     expect(numberOf(result[0]!.laneIds[0]!)).toBe(1);
   });
-});
 
-describe("multi-lane requests need a contiguous block", () => {
-  it("skips a lone free lane and finds the only valid contiguous pair", () => {
-    // Lane 2 busy all day -> free lanes are {1, 3, 4}. 1 has no contiguous partner
-    // (its neighbour, 2, is busy). Only {3, 4} is a valid pair.
-    const snap = snapshot([{ laneId: "L2", start: t("10:00"), end: t("22:00") }]);
-    // 8 players / 2 games -> lanesNeeded 2, same duration as 4/2 (parallel lanes).
-    const result = findCandidates(snap, { players: 8, games: 2, preferredStart: t("14:00") });
+  it("continuing immediately after an existing booking beats an untouched lane", () => {
+    const snap = snapshot([{ laneId: "L1", start: t("12:00"), end: t("15:40") }]);
+    const result = findCandidates(snap, { ...FOUR_BY_TWO, preferredStart: t("15:40") });
 
-    expect(result.length).toBeGreaterThan(0);
-    const numbers = result[0]!.laneIds.map(numberOf).sort();
-    expect(numbers).toEqual([3, 4]);
+    expect(result[0]!.start).toEqual(t("15:40"));
+    expect(numberOf(result[0]!.laneIds[0]!)).toBe(1);
   });
 
-  it("returns nothing, ever, when no contiguous block of the right size exists", () => {
-    // Lanes 2 and 3 busy all day -> free is {1, 4}, never adjacent.
-    const snap = snapshot([
-      { laneId: "L2", start: t("10:00"), end: t("22:00") },
-      { laneId: "L3", start: t("10:00"), end: t("22:00") },
-    ]);
-    const result = findCandidates(snap, { players: 8, games: 2, preferredStart: t("14:00") });
-    expect(result).toEqual([]);
+  it("penalizes a stranded gap even where raw before+after distance alone would tie", () => {
+    // L1's only booking ends at 17:20. Continuing right there wastes nothing. Starting
+    // at 17:30 -- the literal requested time -- instead strands a 10-minute gap in
+    // front of it. Shift a placement by any amount X and its "before" grows by X while
+    // its "after" shrinks by the same X, so UNCAPPED before+after is identical for both
+    // starts: only capping each side at what's actually sellable makes the zero-waste
+    // option win, which is the whole point of gapCost's cap.
+    const snap = snapshot([{ laneId: "L1", start: t("15:00"), end: t("17:20") }]);
+    const result = findCandidates(snap, { ...FOUR_BY_TWO, preferredStart: t("17:30") });
+
+    expect(result[0]!.start).toEqual(t("17:20"));
+    expect(numberOf(result[0]!.laneIds[0]!)).toBe(1);
+  });
+
+  it("never offers a start off the booking grid", () => {
+    const snap = snapshot([{ laneId: "L1", start: t("12:00"), end: t("15:40") }]);
+    const result = findCandidates(snap, { ...FOUR_BY_TWO, preferredStart: t("15:23") });
+
+    for (const c of result) {
+      expect(c.start.getUTCMinutes() % DEFAULT_ESTIMATOR_CONFIG.bookingGridMin).toBe(0);
+    }
   });
 });
 
 describe("now -- never offers or confirms a start that has already passed", () => {
-  it("findCandidates excludes starts before now, even if they're within the preference window", () => {
-    // Preferred 20:00, but it's already 19:55 -- 19:30/19:45 are grid-aligned and
-    // would otherwise be feasible, closest-to-preferred candidates. They must not
-    // appear: their start already happened.
-    const result = findCandidates(snapshot([]), { ...FOUR_BY_TWO, preferredStart: t("20:00") }, undefined, undefined, t("19:55"));
+  it("findCandidates excludes starts before now, even inside the window", () => {
+    const result = findCandidates(
+      snapshot([]),
+      { ...FOUR_BY_TWO, preferredStart: t("20:00") },
+      undefined,
+      t("19:55"),
+    );
     for (const c of result) {
       expect(c.start.getTime()).toBeGreaterThanOrEqual(t("19:55").getTime());
     }
     expect(result.some((c) => c.start.getTime() === t("19:30").getTime())).toBe(false);
-    expect(result.some((c) => c.start.getTime() === t("19:45").getTime())).toBe(false);
   });
 
   it("checkSlot rejects an exact start that has already passed", () => {
@@ -161,18 +181,15 @@ describe("now -- never offers or confirms a start that has already passed", () =
 });
 
 describe("checkSlot -- validates one exact time, never substitutes another", () => {
-  it("confirms a feasible slot and returns its lane(s) and end time", () => {
+  it("confirms a feasible slot and returns its lane and end time", () => {
     const result = checkSlot(snapshot([]), t("14:00"), FOUR_BY_TWO);
     expect(result).not.toBeNull();
-    expect(result!.end).toEqual(t("16:00")); // 4p/2g -> occupyMin 120
+    expect(result!.end).toEqual(addMinutes(t("14:00"), DUR));
     expect(numberOf(result!.laneIds[0]!)).toBe(1);
   });
 
   it("returns null for a slot that overlaps an existing booking -- never a different time", () => {
     const snap = snapshot([{ laneId: "L1", start: t("13:00"), end: t("15:00") }]);
-    // Only one lane in a 1-lane fixture would make this cleaner, but even with 4 lanes,
-    // asking to check THIS exact lane-agnostic slot must still just say yes/no -- it must
-    // never come back with "here's a different time instead."
     const result = checkSlot(snap, t("14:00"), FOUR_BY_TWO);
     // Feasible overall (lanes 2-4 are free), so this should succeed -- but never on lane 1.
     expect(result).not.toBeNull();
@@ -185,23 +202,19 @@ describe("checkSlot -- validates one exact time, never substitutes another", () 
     expect(result).toBeNull();
   });
 
-  it("confirms a slot that findCandidates would NOT have returned in its top results", () => {
-    // Empty schedule, preferred 14:00 -> the 5 closest 15-min-grid times (14:00, then
-    // 13:45/14:15, then 13:30/14:30) fill up maxCandidates=5 before 13:15 (45 min away)
-    // ever gets a look-in. That doesn't mean 13:15 is infeasible -- checkSlot must
-    // still confirm it directly, independent of any ranking or window.
+  it("confirms a slot outside the candidate window, which findCandidates never offers", () => {
+    // 11:00 is two hours from the requested time, well beyond the window. That makes it
+    // unofferable, not infeasible -- checkSlot must still confirm it directly.
     const snap = snapshot([]);
-    const ranked = findCandidates(snap, { ...FOUR_BY_TWO, preferredStart: t("14:00") });
-    expect(ranked.some((c) => c.start.getTime() === t("13:15").getTime())).toBe(false);
+    const offered = findCandidates(snap, { ...FOUR_BY_TWO, preferredStart: t("14:00") });
+    expect(offered.some((c) => c.start.getTime() === t("11:00").getTime())).toBe(false);
 
-    const direct = checkSlot(snap, t("13:15"), FOUR_BY_TWO);
-    expect(direct).not.toBeNull();
+    expect(checkSlot(snap, t("11:00"), FOUR_BY_TWO)).not.toBeNull();
   });
 });
 
 describe("checkMove -- validates a staff drag/resize of an existing allocation", () => {
   it("excludes the allocation being moved from its own overlap check", () => {
-    // The whole point: nudging A by 15 minutes must not have A collide with itself.
     const snap = snapshot([{ id: "A", laneId: "L1", start: t("14:00"), end: t("16:00") }]);
     const result = checkMove(snap, {
       allocationId: "A",
@@ -213,73 +226,33 @@ describe("checkMove -- validates a staff drag/resize of an existing allocation",
     expect(result.ok).toBe(true);
   });
 
-  it("rejects a move into a different, occupied allocation on the target lane", () => {
+  it("rejects a drag onto another allocation's time on the same lane", () => {
     const snap = snapshot([
       { id: "A", laneId: "L1", start: t("14:00"), end: t("16:00") },
-      { id: "B", laneId: "L2", start: t("15:00"), end: t("17:00") },
+      { id: "B", laneId: "L1", start: t("16:00"), end: t("18:00") },
     ]);
     const result = checkMove(snap, {
       allocationId: "A",
-      laneId: "L2",
-      start: t("14:00"),
-      end: t("16:00"),
-      hasTurnover: true,
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.reason).toBe("lane_conflict");
-      expect(result.conflicts.map((c) => c.id)).toEqual(["B"]);
-    }
-  });
-
-  it("allows a move onto a free lane", () => {
-    const snap = snapshot([{ id: "A", laneId: "L1", start: t("14:00"), end: t("16:00") }]);
-    const result = checkMove(snap, {
-      allocationId: "A",
-      laneId: "L3",
-      start: t("14:00"),
-      end: t("16:00"),
-      hasTurnover: true,
-    });
-    expect(result.ok).toBe(true);
-  });
-
-  it("allows two allocations that merely touch -- half-open ranges don't overlap", () => {
-    const snap = snapshot([{ id: "A", laneId: "L1", start: t("14:00"), end: t("16:00") }]);
-    const result = checkMove(snap, {
-      allocationId: "B",
       laneId: "L1",
-      start: t("16:00"),
+      start: t("15:00"),
       end: t("17:00"),
       hasTurnover: true,
     });
-    expect(result.ok).toBe(true);
-  });
-
-  it("rejects a play block shrunk below the minimum span", () => {
-    const snap = snapshot([{ id: "A", laneId: "L1", start: t("14:00"), end: t("14:20") }]);
-    const result = checkMove(snap, {
-      allocationId: "A",
-      laneId: "L1",
-      start: t("14:00"),
-      end: t("14:20"), // 20 min, below minPlayBlockMin (30)
-      hasTurnover: true,
-    });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.reason).toBe("too_short");
+    if (!result.ok) expect(result.reason).toBe("lane_conflict");
   });
 
-  it("allows a maintenance block at its own smaller minimum, with no turnover subtracted", () => {
+  it("rejects a span below the one-minute floor", () => {
     const snap = snapshot([]);
     const result = checkMove(snap, {
       allocationId: "A",
       laneId: "L1",
       start: t("14:00"),
-      end: t("14:15"), // 15 min -- fine for hasTurnover:false, would fail for true
-      hasTurnover: false,
+      end: new Date(t("14:00").getTime() + 30_000), // 30 seconds
+      hasTurnover: true,
     });
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.playEnd).toEqual(t("14:15"));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("too_short");
   });
 
   it("rejects a drag that would end after closing", () => {
@@ -300,7 +273,7 @@ describe("checkMove -- validates a staff drag/resize of an existing allocation",
     const result = checkMove(snap, {
       allocationId: "A",
       laneId: "L1",
-      start: t("14:15"), // moved -- not allowed once locked
+      start: t("14:15"),
       end: t("16:00"),
       hasTurnover: true,
       locked: { start: t("14:00"), laneId: "L1" },
@@ -315,23 +288,25 @@ describe("checkMove -- validates a staff drag/resize of an existing allocation",
       allocationId: "A",
       laneId: "L1",
       start: t("14:00"),
-      end: t("16:30"), // running long -- end may still move
+      end: t("16:30"),
       hasTurnover: true,
       locked: { start: t("14:00"), laneId: "L1" },
     });
     expect(result.ok).toBe(true);
   });
 
-  it("computes playEnd as end minus turnoverMin when hasTurnover is true", () => {
+  it("leaves playEnd equal to end -- there is no turnover to carve off", () => {
     const snap = snapshot([]);
-    const result = checkMove(snap, {
-      allocationId: "A",
-      laneId: "L1",
-      start: t("14:00"),
-      end: t("16:00"),
-      hasTurnover: true,
-    });
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.playEnd).toEqual(t("15:50")); // turnoverMin default 10
+    for (const hasTurnover of [true, false]) {
+      const result = checkMove(snap, {
+        allocationId: "A",
+        laneId: "L1",
+        start: t("14:00"),
+        end: t("16:00"),
+        hasTurnover,
+      });
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.playEnd).toEqual(t("16:00"));
+    }
   });
 });

@@ -180,8 +180,7 @@ export function BookingForm({ packages }: { packages: PackageOption[] }) {
           </div>
 
           <p className={styles.durationNote}>
-            About {formatMinutes(duration.playMin)} of lane time
-            {duration.lanesNeeded > 1 ? ` across ${duration.lanesNeeded} adjacent lanes` : ""} for {players} player
+            About {formatMinutes(duration.playMin)} of lane time for {players} player
             {players === 1 ? "" : "s"}.
           </p>
         </div>

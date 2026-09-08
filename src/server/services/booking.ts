@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../../db/client";
 import { tstzrangeLiteral } from "../../db/range";
 import { booking, laneAllocation } from "../../db/schema";
-import { DEFAULT_ESTIMATOR_CONFIG, DEFAULT_SCHEDULER_CONFIG } from "../../domain/config";
+import { DEFAULT_ESTIMATOR_CONFIG } from "../../domain/config";
 import { estimateDuration } from "../../domain/estimator";
 import { checkSlot } from "../../domain/scheduler";
 import { addMinutes, businessDate, rolloverHour } from "../../domain/time";
@@ -43,19 +43,18 @@ export type CreateBookingInput = AvailabilityRequest & {
 };
 
 /**
- * Picks the best available slot (M3's top-ranked candidate) and books it atomically.
+ * Picks the slot nearest the requested time and books it atomically.
  *
- * On the rare race where someone else claims that exact lane/time between scoring and
+ * On the rare race where someone else claims that exact lane/time between selection and
  * inserting, retries the WHOLE pipeline against fresh state -- retrying the identical
  * placement would just fail again, since something else took it -- up to 3 attempts.
  */
 export async function createBooking(venue: Venue, input: CreateBookingInput) {
   const estimatorCfg = DEFAULT_ESTIMATOR_CONFIG;
-  const schedulerCfg = DEFAULT_SCHEDULER_CONFIG;
   const MAX_ATTEMPTS = 3;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const candidates = await getAvailability(venue, input, schedulerCfg, estimatorCfg);
+    const candidates = await getAvailability(venue, input, estimatorCfg);
     const best = candidates[0];
     if (!best) throw new NoAvailabilityError();
 
