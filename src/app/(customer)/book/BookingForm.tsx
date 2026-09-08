@@ -2,9 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { estimateDuration } from "../../../domain/estimator";
 import btn from "../_components/Button.module.css";
-import { formatMinutes } from "../format";
 import { confirmBooking, findTimes, type TimeOption } from "./actions";
 import styles from "./book.module.css";
 
@@ -104,7 +102,6 @@ export function BookingForm({ packages }: { packages: PackageOption[] }) {
   const selectedPackage = packages.find((p) => p.id === selectedPackageId);
   const selectedTimeLabel = times.find((t) => t.startIso === selectedTimeIso)?.label;
   const total = selectedPackage ? selectedPackage.pricePerPerson * players : 0;
-  const duration = estimateDuration(players, games);
   const step3Unlocked = Boolean(selectedTimeIso);
 
   return (
@@ -178,11 +175,6 @@ export function BookingForm({ packages }: { packages: PackageOption[] }) {
               ))}
             </div>
           </div>
-
-          <p className={styles.durationNote}>
-            About {formatMinutes(duration.playMin)} of lane time for {players} player
-            {players === 1 ? "" : "s"}.
-          </p>
         </div>
 
         <form

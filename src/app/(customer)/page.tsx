@@ -8,13 +8,8 @@ import btn from "./_components/Button.module.css";
 import { formatHour } from "./format";
 import styles from "./landing.module.css";
 
-/** Display copy only. The scheduler no longer splits a party across lanes, so this is
- *  a fact about the venue rather than an input to any calculation. */
-const MAX_PLAYERS_PER_LANE = 6;
-
 import heroPhoto from "../../assets/photos/hero-alley.jpg";
 import laneDarkPhoto from "../../assets/photos/lane-dark.jpg";
-import pinsClosePhoto from "../../assets/photos/pins-closeup.jpg";
 import ballReturnPhoto from "../../assets/photos/ball-return.jpg";
 import shoesFloorPhoto from "../../assets/photos/shoes-floor.jpg";
 import friendsChattingPhoto from "../../assets/photos/friends-chatting.jpg";
@@ -72,7 +67,6 @@ export default async function LandingPage() {
 
   const stats = [
     { photo: laneDarkPhoto, value: String(laneCount), label: laneCount === 1 ? "Bowling Lane" : "Bowling Lanes" },
-    { photo: pinsClosePhoto, value: `Up to ${MAX_PLAYERS_PER_LANE}`, label: "Players per Lane" },
     { photo: ballReturnPhoto, value: String(packages.length), label: packages.length === 1 ? "Package" : "Packages" },
     { photo: shoesFloorPhoto, value: hours, label: "Open Daily" },
   ];
@@ -188,7 +182,7 @@ export default async function LandingPage() {
         <div className={styles.amenitiesGrid}>
           {[
             { icon: "⚡", label: "Instant lane assignment" },
-            { icon: "👥", label: "Big groups split across adjacent lanes" },
+            { icon: "🎉", label: "The ultimate hangout spot" },
             { icon: "⏱️", label: "Minimal customer wait time" },
             { icon: "🚶", label: "Walk-ins always welcome" },
           ].map((a) => (
