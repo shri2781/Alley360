@@ -35,7 +35,11 @@ export async function findTimes(input: FindTimesInput): Promise<TimeOption[]> {
     preferredStart,
   });
 
-  return candidates.map((c) => ({
+  // getAvailability ranks by tightest lane-packing first, not by time -- reorder
+  // chronologically for display, so the customer reads a normal, sorted list of times.
+  const sorted = [...candidates].sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  return sorted.map((c) => ({
     startIso: c.start.toISOString(),
     label: new Intl.DateTimeFormat("en-US", {
       timeZone: venue.timezone,
