@@ -12,10 +12,11 @@
  *     original prediction. Overwriting a prediction with its outcome destroys the only
  *     signal that could ever calibrate the guessed constants in src/domain/config.ts.
  *
- *   - `booking.scheduled_start` IS rewritten, because a staff move normally reflects a
- *     real change to the agreement ("customer rang and asked for 8pm"). For a booking
- *     holding several lanes it is the MINIMUM start across its surviving allocations --
- *     one column cannot track several lanes independently.
+ *   - `booking.scheduled_start` IS rewritten for a confirmed booking, because a staff
+ *     move normally reflects a real change to the agreement ("customer rang and asked
+ *     for 8pm"). Active bookings are immutable. For a booking holding several lanes it
+ *     is the MINIMUM start across its surviving allocations -- one column cannot track
+ *     several lanes independently.
  */
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../../db/client";
@@ -27,12 +28,18 @@ import { businessDate, rolloverHour } from "../../domain/time";
 import { isExclusionViolation } from "./booking";
 import { loadSnapshot, type Venue } from "./availability";
 
-export type MoveFailure = MoveRejection | "not_found" | "released" | "conflict";
+export type MoveFailure = MoveRejection | "not_found" | "released" | "active" | "conflict";
 
 export class MoveRejectedError extends Error {
   constructor(readonly reason: MoveFailure) {
     super(`move rejected: ${reason}`);
   }
+}
+
+/** Active bookings already have a session record. Their lane and timing are history,
+ * not a future reservation that can be rearranged on the timeline. */
+export function ensureBookingCanMove(status: "confirmed" | "active" | "completed" | "cancelled" | "no_show") {
+  if (status === "active") throw new MoveRejectedError("active");
 }
 
 export type MoveAllocationInput = {
@@ -65,16 +72,12 @@ export async function moveAllocation(venue: Venue, input: MoveAllocationInput) {
 
       if (!row) throw new MoveRejectedError("not_found");
       if (row.allocation.status === "released") throw new MoveRejectedError("released");
+      ensureBookingCanMove(row.booking.status);
 
       // Only affects which minimum span applies (minPlayBlockMin vs minMaintenanceBlockMin)
       // -- play_window always equals occupies now, for either kind.
       const hasTurnover = row.booking.kind !== "block";
 
-      // No lock: an in-progress session can be moved just like anything else. This
-      // will diverge from session.started_at, same as a moved booking's
-      // scheduled_start diverges from its allocation -- staff authority beats the
-      // original record. Only a genuine double-booking (checked below, and backstopped
-      // by the exclusion constraint) can reject a move.
       const check = checkMove(snapshot, {
         allocationId: input.allocationId,
         laneId: input.laneId,
@@ -147,6 +150,7 @@ const MESSAGES: Record<MoveFailure, string> = {
   locked_lane: "This session has already started — it can't be moved to another lane.",
   not_found: "That booking no longer exists.",
   released: "That booking has already been cancelled or completed.",
+  active: "This booking has already started and can no longer be changed.",
   conflict: "Someone else took that slot first.",
 };
 

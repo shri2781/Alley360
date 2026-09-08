@@ -1,4 +1,7 @@
 :root {
+  /* Local system-font stacks keep local development and offline builds working. */
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
   --bg: #0d0817;
   --surface: #171126;
   --border: #2f2647;

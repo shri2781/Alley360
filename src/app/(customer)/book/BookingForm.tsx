@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import btn from "../_components/Button.module.css";
 import { confirmBooking, findTimes, type TimeOption } from "./actions";
+import { validateCustomerName } from "../../../domain/bookingInput";
 import styles from "./book.module.css";
 
 export type PackageOption = {
@@ -65,13 +66,13 @@ export function BookingForm({ packages }: { packages: PackageOption[] }) {
 
   const trimmedName = customerName.trim();
   const trimmedPhone = customerPhone.trim();
-  const nameValid = trimmedName.length > 0;
+  const nameValid = validateCustomerName(trimmedName) === null;
   const phoneValid = /^\d{10}$/.test(trimmedPhone);
 
   async function handleConfirm() {
     if (!selectedTimeIso) return;
     if (!nameValid) {
-      setErrorMsg("Name is required.");
+      setErrorMsg(validateCustomerName(trimmedName) ?? "Name is required.");
       return;
     }
     if (!phoneValid) {

@@ -1,11 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Anton } from "next/font/google";
 import { getVenue } from "../server/venue";
 import "./globals.css";
-
-// Self-hosted by next/font -- no request to Google at runtime, no layout shift.
-const inter = Inter({ subsets: ["latin"], variable: "--font-body" });
-const anton = Anton({ subsets: ["latin"], weight: "400", variable: "--font-display" });
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -29,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${anton.variable}`}>
+    <html lang="en">
       <body>{children}</body>
     </html>
   );

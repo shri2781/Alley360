@@ -12,6 +12,7 @@ import { createBooking, NoAvailabilityError } from "../../../server/services/boo
 import { startSession } from "../../../server/services/session";
 import { getVenue } from "../../../server/venue";
 import { getStaffUser, requireStaff } from "../../../server/auth/dal";
+import { validateCustomerName } from "../../../domain/bookingInput";
 
 /** A walk-in is bowling now -- create the booking and start its session in one step,
  *  matching the counter flow: party arrives, staff enter size, they start playing. */
@@ -30,8 +31,9 @@ export async function addWalkIn(formData: FormData) {
   if (!Number.isInteger(games) || games < 1) {
     redirect("/staff?error=" + encodeURIComponent("Enter a valid number of games."));
   }
-  if (!customerName) {
-    redirect("/staff?error=" + encodeURIComponent("Enter the customer's name."));
+  const customerNameError = validateCustomerName(customerName);
+  if (customerNameError) {
+    redirect("/staff?error=" + encodeURIComponent(customerNameError));
   }
 
   const venue = await getVenue();
