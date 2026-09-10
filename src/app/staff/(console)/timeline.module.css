@@ -141,13 +141,10 @@
   /* without this, a touch drag scrolls .timelineWrap instead of moving the block */
   touch-action: none;
   user-select: none;
-}
-
-.blockMovable {
   cursor: grab;
 }
 
-.blockMovable:active {
+.block:active {
   cursor: grabbing;
 }
 

@@ -19,7 +19,6 @@ export type TimelineBlock = {
   bookingId: string;
   laneId: string;
   kind: "booked" | "walkin" | "maintenance";
-  /** 'active' means a session is running: its start is fixed, only its end can move. */
   status: "confirmed" | "active";
   label: string;
   partySize: number;
@@ -27,17 +26,12 @@ export type TimelineBlock = {
   /** Clamped to the visible window -- a session that started before the window
    *  begins renders from the left edge rather than overflowing off-screen. */
   start: Date;
-  playEnd: Date;
   occupyEnd: Date;
   /** The REAL allocation bounds, unclamped. Layout uses the clamped pair above; any
    *  arithmetic that ends up written back to the database must use these, or a block
    *  that merely runs off the edge of the view would be silently truncated on save. */
   trueStart: Date;
   trueEnd: Date;
-  /** True when the block actually begins before the visible window. Such a block can
-   *  still be resized, but dragging its body would be misleading -- the grab point
-   *  doesn't correspond to its real start. */
-  clippedStart: boolean;
 };
 
 export type TimelineData = {
@@ -46,11 +40,6 @@ export type TimelineData = {
   now: Date;
   windowStart: Date;
   windowEnd: Date;
-  /** The venue's real opening/closing instants for this business day. Distinct from
-   *  windowStart, which is only "now, floored to the hour" -- the client needs the real
-   *  bounds to validate a drag the same way the server does. */
-  openAt: Date;
-  closeAt: Date;
   lanes: { id: string; number: number; displayName: string }[];
   blocks: TimelineBlock[];
   stats: {
@@ -97,7 +86,6 @@ export async function getTimeline(venueId: string): Promise<TimelineData> {
 
   for (const r of rows) {
     const occ = parseTstzrange(r.allocation.occupies);
-    const play = parseTstzrange(r.allocation.playWindow);
 
     if (occ.start <= now && now < occ.end) activeSessions += 1;
 
@@ -117,11 +105,9 @@ export async function getTimeline(venueId: string): Promise<TimelineData> {
       partySize: r.booking.partySize,
       games: r.booking.games,
       start: occ.start < windowStart ? windowStart : occ.start,
-      playEnd: play.end < windowStart ? windowStart : play.end > windowEnd ? windowEnd : play.end,
       occupyEnd: occ.end > windowEnd ? windowEnd : occ.end,
       trueStart: occ.start,
       trueEnd: occ.end,
-      clippedStart: occ.start < windowStart,
     });
   }
 
@@ -131,8 +117,6 @@ export async function getTimeline(venueId: string): Promise<TimelineData> {
     now,
     windowStart,
     windowEnd,
-    openAt,
-    closeAt,
     lanes: lanes.map((l) => ({ id: l.id, number: l.number, displayName: l.displayName })),
     blocks,
     stats: {

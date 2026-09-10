@@ -3,7 +3,6 @@ import { DEFAULT_ESTIMATOR_CONFIG } from "./config";
 import { estimateDuration } from "./estimator";
 import {
   CANDIDATE_WINDOW_MIN,
-  checkMove,
   checkSlot,
   findCandidates,
   type Allocation,
@@ -213,100 +212,3 @@ describe("checkSlot -- validates one exact time, never substitutes another", () 
   });
 });
 
-describe("checkMove -- validates a staff drag/resize of an existing allocation", () => {
-  it("excludes the allocation being moved from its own overlap check", () => {
-    const snap = snapshot([{ id: "A", laneId: "L1", start: t("14:00"), end: t("16:00") }]);
-    const result = checkMove(snap, {
-      allocationId: "A",
-      laneId: "L1",
-      start: t("14:15"),
-      end: t("16:15"),
-      hasTurnover: true,
-    });
-    expect(result.ok).toBe(true);
-  });
-
-  it("rejects a drag onto another allocation's time on the same lane", () => {
-    const snap = snapshot([
-      { id: "A", laneId: "L1", start: t("14:00"), end: t("16:00") },
-      { id: "B", laneId: "L1", start: t("16:00"), end: t("18:00") },
-    ]);
-    const result = checkMove(snap, {
-      allocationId: "A",
-      laneId: "L1",
-      start: t("15:00"),
-      end: t("17:00"),
-      hasTurnover: true,
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.reason).toBe("lane_conflict");
-  });
-
-  it("rejects a span below the one-minute floor", () => {
-    const snap = snapshot([]);
-    const result = checkMove(snap, {
-      allocationId: "A",
-      laneId: "L1",
-      start: t("14:00"),
-      end: new Date(t("14:00").getTime() + 30_000), // 30 seconds
-      hasTurnover: true,
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.reason).toBe("too_short");
-  });
-
-  it("rejects a drag that would end after closing", () => {
-    const snap = snapshot([]);
-    const result = checkMove(snap, {
-      allocationId: "A",
-      laneId: "L1",
-      start: t("21:30"),
-      end: t("22:15"),
-      hasTurnover: true,
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.reason).toBe("after_close");
-  });
-
-  it("rejects any change to a locked (active-session) start", () => {
-    const snap = snapshot([{ id: "A", laneId: "L1", start: t("14:00"), end: t("16:00") }]);
-    const result = checkMove(snap, {
-      allocationId: "A",
-      laneId: "L1",
-      start: t("14:15"),
-      end: t("16:00"),
-      hasTurnover: true,
-      locked: { start: t("14:00"), laneId: "L1" },
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.reason).toBe("locked_start");
-  });
-
-  it("allows extending the end of a locked (active-session) allocation", () => {
-    const snap = snapshot([{ id: "A", laneId: "L1", start: t("14:00"), end: t("16:00") }]);
-    const result = checkMove(snap, {
-      allocationId: "A",
-      laneId: "L1",
-      start: t("14:00"),
-      end: t("16:30"),
-      hasTurnover: true,
-      locked: { start: t("14:00"), laneId: "L1" },
-    });
-    expect(result.ok).toBe(true);
-  });
-
-  it("leaves playEnd equal to end -- there is no turnover to carve off", () => {
-    const snap = snapshot([]);
-    for (const hasTurnover of [true, false]) {
-      const result = checkMove(snap, {
-        allocationId: "A",
-        laneId: "L1",
-        start: t("14:00"),
-        end: t("16:00"),
-        hasTurnover,
-      });
-      expect(result.ok).toBe(true);
-      if (result.ok) expect(result.playEnd).toEqual(t("16:00"));
-    }
-  });
-});

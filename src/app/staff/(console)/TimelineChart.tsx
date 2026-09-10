@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { acquireRefreshPause } from "../../../components/refreshGate";
 import { DEFAULT_ESTIMATOR_CONFIG } from "../../../domain/config";
-import { checkMove, roundToGrid, type ScheduleSnapshot } from "../../../domain/scheduler";
+import { roundToGrid } from "../../../domain/scheduler";
 import { addMinutes } from "../../../domain/time";
 import type { TimelineBlock, TimelineData } from "../../../server/timeline";
 import { moveAllocationAction } from "./actions";
@@ -18,6 +18,11 @@ const OVERRIDE_TIMEOUT_MS = 8_000;
 const GUTTER_PX = 88;
 
 type Placement = { laneId: string; start: Date; end: Date };
+
+/** The only client-side check left: a staff override may go anywhere -- overlapping,
+ *  off-hours, any length -- but an inverted range is unstorable. A genuine double-booking
+ *  is caught by the exclusion constraint in Postgres and reported by the server. */
+const isValidPlacement = (p: Placement) => p.end.getTime() > p.start.getTime();
 
 type DragState = {
   allocationId: string;
@@ -101,7 +106,6 @@ export function TimelineChart({ data }: { data: TimelineData }) {
         trueEnd: o.end,
         start: o.start < windowStart ? windowStart : o.start,
         occupyEnd: o.end > windowEnd ? windowEnd : o.end,
-        clippedStart: o.start < windowStart,
       };
     });
   }, [data.blocks, overrides, windowStart, windowEnd]);
@@ -138,36 +142,6 @@ export function TimelineChart({ data }: { data: TimelineData }) {
     return () => clearTimeout(id);
   }, [overrides]);
 
-  /** Client-side feasibility, for instant feedback only. The exclusion constraint in
-   *  Postgres remains the authority -- this snapshot only covers blocks inside the
-   *  visible window, so it can miss a conflict the server will still catch. */
-  const validate = useCallback(
-    (block: TimelineBlock, placement: Placement) => {
-      const snapshot: ScheduleSnapshot = {
-        lanes: lanes.map((l) => ({ id: l.id, number: l.number })),
-        allocations: blocks.map((b) => ({
-          id: b.allocationId,
-          laneId: b.laneId,
-          start: b.trueStart,
-          end: b.trueEnd,
-        })),
-        openAt: data.openAt,
-        closeAt: data.closeAt,
-      };
-
-      return checkMove(snapshot, {
-        allocationId: block.allocationId,
-        laneId: placement.laneId,
-        start: placement.start,
-        end: placement.end,
-        hasTurnover: block.kind !== "maintenance",
-        // No lock: an in-progress session can be moved just like anything else. Only a
-        // genuine double-booking (the overlap check above) can reject a drop.
-      });
-    },
-    [blocks, lanes, data.openAt, data.closeAt],
-  );
-
   const laneAtY = useCallback(
     (clientY: number, fallback: string): string => {
       for (const l of lanes) {
@@ -187,9 +161,8 @@ export function TimelineChart({ data }: { data: TimelineData }) {
       const trackRect = session.trackEl.getBoundingClientRect();
 
       // Both resize modes read an ABSOLUTE time off the pointer's position along the
-      // whole window, unlike "move" below -- that's what makes resize-start correct even
-      // on a clippedStart block: the grab point is wherever the pointer visibly is, not
-      // an offset from the block's (possibly off-screen) true start.
+      // whole window, unlike "move" below -- the grab point is wherever the pointer
+      // visibly is, not an offset from the block's (possibly off-screen) true start.
       const ratioToTime = (x: number) => {
         const ratio = (x - trackRect.left) / trackRect.width;
         return roundToGrid(new Date(windowStart.getTime() + ratio * totalMs), GRID_MIN);
@@ -221,10 +194,6 @@ export function TimelineChart({ data }: { data: TimelineData }) {
   const beginPointer = useCallback(
     (e: React.PointerEvent<HTMLDivElement>, block: TimelineBlock, mode: DragMode) => {
       if (e.button !== 0) return;
-      // clippedStart blocks are still resizable (from either edge) but not draggable-by-
-      // body -- the body-drag grab point wouldn't correspond to their real (off-screen)
-      // start, whereas a resize reads an absolute time off the pointer regardless.
-      if (mode === "move" && block.clippedStart) return;
 
       const trackEl = (e.currentTarget.closest(`.${styles.track}`) ?? null) as HTMLElement | null;
       const tracksEl = tracksRef.current;
@@ -264,7 +233,6 @@ export function TimelineChart({ data }: { data: TimelineData }) {
       }
 
       const placement = placementFor(session, e.clientX, e.clientY);
-      const result = validate(session.block, placement);
 
       // Ghost position is relative to .tracksArea; both rects are read now, so a page
       // scroll shifts them together and the offset stays right.
@@ -277,12 +245,12 @@ export function TimelineChart({ data }: { data: TimelineData }) {
         laneId: placement.laneId,
         start: placement.start,
         end: placement.end,
-        valid: result.ok,
+        valid: isValidPlacement(placement),
         top: rowRect ? rowRect.top - tracksRect.top + 8 : 8,
         height: rowRect ? rowRect.height - 16 : 40,
       });
     },
-    [placementFor, validate],
+    [placementFor],
   );
 
   const finishPointer = useCallback(
@@ -307,10 +275,10 @@ export function TimelineChart({ data }: { data: TimelineData }) {
         placement.start.getTime() === block.trueStart.getTime() &&
         placement.end.getTime() === block.trueEnd.getTime();
 
-      const result = validate(block, placement);
+      const valid = isValidPlacement(placement);
 
-      if (unchanged || !result.ok) {
-        if (!result.ok && !unchanged) setError(rejectionMessage(result.reason));
+      if (unchanged || !valid) {
+        if (!valid && !unchanged) setError("That would end before it starts.");
         session.releasePause?.();
         return;
       }
@@ -339,7 +307,7 @@ export function TimelineChart({ data }: { data: TimelineData }) {
         }
       });
     },
-    [placementFor, validate],
+    [placementFor],
   );
 
   const cancelPointer = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -437,14 +405,13 @@ export function TimelineChart({ data }: { data: TimelineData }) {
                       const left = pct(windowStart, b.start, totalMs);
                       const right = pct(windowStart, b.occupyEnd, totalMs);
                       const isDragging = drag?.allocationId === b.allocationId;
-                      const movable = !b.clippedStart;
 
                       return (
                         <div
                           key={b.allocationId}
                           className={`${styles.block} ${BLOCK_CLASS[b.kind]} ${
                             isDragging ? styles.blockDragging : ""
-                          } ${movable ? styles.blockMovable : ""}`}
+                          }`}
                           style={{ left: `${left}%`, width: `${Math.max(right - left, 1)}%` }}
                           title={`${b.label} - ${b.partySize} players, ${b.games} games\n${formatTime(
                             b.trueStart,
@@ -491,23 +458,4 @@ export function TimelineChart({ data }: { data: TimelineData }) {
       {blocks.length === 0 && <p className={styles.emptyNote}>Nothing on the schedule for this window.</p>}
     </div>
   );
-}
-
-function rejectionMessage(reason: string): string {
-  switch (reason) {
-    case "too_short":
-      return `Too short — a booking needs at least ${DEFAULT_ESTIMATOR_CONFIG.minPlayBlockMin} minutes.`;
-    case "before_open":
-      return "That starts before the alley opens.";
-    case "after_close":
-      return "That would run past closing time.";
-    case "lane_conflict":
-      return "Another booking is already on that lane at that time.";
-    case "locked_start":
-      return "This session has already started — you can only change when it ends.";
-    case "locked_lane":
-      return "This session has already started — it can't be moved to another lane.";
-    default:
-      return "That move isn't possible.";
-  }
 }

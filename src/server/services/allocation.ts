@@ -14,32 +14,23 @@
  *
  *   - `booking.scheduled_start` IS rewritten for a confirmed booking, because a staff
  *     move normally reflects a real change to the agreement ("customer rang and asked
- *     for 8pm"). Active bookings are immutable. For a booking holding several lanes it
- *     is the MINIMUM start across its surviving allocations -- one column cannot track
- *     several lanes independently.
+ *     for 8pm"). For a booking holding several lanes it is the MINIMUM start across its
+ *     surviving allocations -- one column cannot track several lanes independently.
  */
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../../db/client";
 import { parseTstzrange, tstzrangeLiteral } from "../../db/range";
 import { booking, laneAllocation } from "../../db/schema";
-import { DEFAULT_ESTIMATOR_CONFIG } from "../../domain/config";
-import { checkMove, type MoveRejection } from "../../domain/scheduler";
 import { businessDate, rolloverHour } from "../../domain/time";
 import { isExclusionViolation } from "./booking";
-import { loadSnapshot, type Venue } from "./availability";
+import { type Venue } from "./availability";
 
-export type MoveFailure = MoveRejection | "not_found" | "released" | "active" | "conflict";
+export type MoveFailure = "end_before_start" | "not_found" | "released" | "conflict";
 
 export class MoveRejectedError extends Error {
   constructor(readonly reason: MoveFailure) {
     super(`move rejected: ${reason}`);
   }
-}
-
-/** Active bookings already have a session record. Their lane and timing are history,
- * not a future reservation that can be rearranged on the timeline. */
-export function ensureBookingCanMove(status: "confirmed" | "active" | "completed" | "cancelled" | "no_show") {
-  if (status === "active") throw new MoveRejectedError("active");
 }
 
 export type MoveAllocationInput = {
@@ -54,12 +45,12 @@ export async function moveAllocation(venue: Venue, input: MoveAllocationInput) {
   const start = new Date(input.startISO);
   const end = new Date(input.endISO);
 
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+  // Staff overrides are otherwise trusted -- no minimum length, venue-hours or overlap
+  // check here. An inverted range is the exception only because Postgres' tstzrange
+  // constructor hard-errors on lower > upper, so it could never be stored anyway.
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
     throw new MoveRejectedError("end_before_start");
   }
-
-  const bDate = businessDate(start, venue.timezone, rolloverHour(venue.closesAtHour));
-  const snapshot = await loadSnapshot(venue, bDate);
 
   try {
     return await db.transaction(async (tx) => {
@@ -72,28 +63,14 @@ export async function moveAllocation(venue: Venue, input: MoveAllocationInput) {
 
       if (!row) throw new MoveRejectedError("not_found");
       if (row.allocation.status === "released") throw new MoveRejectedError("released");
-      ensureBookingCanMove(row.booking.status);
-
-      // Only affects which minimum span applies (minPlayBlockMin vs minMaintenanceBlockMin)
-      // -- play_window always equals occupies now, for either kind.
-      const hasTurnover = row.booking.kind !== "block";
-
-      const check = checkMove(snapshot, {
-        allocationId: input.allocationId,
-        laneId: input.laneId,
-        start,
-        end,
-        hasTurnover,
-      });
-
-      if (!check.ok) throw new MoveRejectedError(check.reason);
 
       await tx
         .update(laneAllocation)
         .set({
           laneId: input.laneId,
+          // No turnover component anywhere any more, so play_window is the full span.
           occupies: tstzrangeLiteral(start, end),
-          playWindow: tstzrangeLiteral(start, check.playEnd),
+          playWindow: tstzrangeLiteral(start, end),
         })
         .where(eq(laneAllocation.id, input.allocationId));
 
@@ -128,12 +105,11 @@ export async function moveAllocation(venue: Venue, input: MoveAllocationInput) {
         laneId: input.laneId,
         start,
         end,
-        playEnd: check.playEnd,
       };
     });
   } catch (err) {
-    // checkMove should have caught every overlap already, but the constraint is the
-    // real authority -- a concurrent drag can win the race between snapshot and UPDATE.
+    // The EXCLUDE constraint is the only thing stopping two allocations from claiming
+    // the same lane at the same time -- nothing checks for that before the UPDATE.
     if (isExclusionViolation(err)) throw new MoveRejectedError("conflict");
     throw err;
   }
@@ -141,17 +117,9 @@ export async function moveAllocation(venue: Venue, input: MoveAllocationInput) {
 
 const MESSAGES: Record<MoveFailure, string> = {
   end_before_start: "That would end before it starts.",
-  too_short: `Too short — a booking needs at least ${DEFAULT_ESTIMATOR_CONFIG.minPlayBlockMin} minutes.`,
-  before_open: "That starts before the alley opens.",
-  after_close: "That would run past closing time.",
-  unknown_lane: "That lane isn't available.",
-  lane_conflict: "Another booking is already on that lane at that time.",
-  locked_start: "This session has already started — you can only change when it ends.",
-  locked_lane: "This session has already started — it can't be moved to another lane.",
   not_found: "That booking no longer exists.",
   released: "That booking has already been cancelled or completed.",
-  active: "This booking has already started and can no longer be changed.",
-  conflict: "Someone else took that slot first.",
+  conflict: "Another booking is already on that lane at that time.",
 };
 
 export function moveFailureMessage(reason: MoveFailure): string {

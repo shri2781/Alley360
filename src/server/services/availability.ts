@@ -54,7 +54,7 @@ export async function loadSnapshot(venue: Venue, businessDateStr: string): Promi
   const schedulerLanes: SchedulerLane[] = lanes.map((l) => ({ id: l.id, number: l.number }));
   const allocations: Allocation[] = rawAllocations.map((a) => {
     const { start, end } = parseTstzrange(a.occupies);
-    return { id: a.id, laneId: a.laneId, start, end };
+    return { laneId: a.laneId, start, end };
   });
 
   return {

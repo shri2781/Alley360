@@ -22,10 +22,6 @@ export type Lane = {
  *  convention as the database: [start, end) — two allocations that just touch (one
  *  starts when another ends) are not overlapping. */
 export type Allocation = {
-  /** The lane_allocation row id. Optional so existing snapshot fixtures still compile;
-   *  required in practice for checkMove(), which must exclude the allocation being
-   *  moved from its own overlap check. */
-  id?: string;
   laneId: string;
   start: Date;
   end: Date;
@@ -157,85 +153,6 @@ export function checkSlot(
   if (!lane) return null;
 
   return { end, laneIds: [lane.id] };
-}
-
-export type MoveRejection =
-  | "end_before_start"
-  | "too_short"
-  | "before_open"
-  | "after_close"
-  | "unknown_lane"
-  | "lane_conflict"
-  | "locked_start"
-  | "locked_lane";
-
-export type MoveCheck =
-  | { ok: true; end: Date; playEnd: Date }
-  | { ok: false; reason: MoveRejection; conflicts: Allocation[] };
-
-/**
- * Validates a staff drag/resize of an EXISTING allocation to an arbitrary
- * [start, end) on a chosen lane. Deliberately separate from checkSlot(): that function
- * derives `end` from the estimator and picks its own lane, neither of which applies to
- * a manual override, and it has no notion of "the allocation being moved doesn't count
- * as a conflict with itself."
- *
- * No `now` parameter, unlike checkSlot/findCandidates -- those guard a customer-facing
- * booking flow against offering a start that's already passed. Staff correcting the
- * board after the fact (backdating a walk-in, fixing a mistake) is a legitimate use of
- * this function, so the past is not rejected here.
- */
-export function checkMove(
-  snapshot: ScheduleSnapshot,
-  req: {
-    allocationId: string;
-    laneId: string;
-    start: Date;
-    end: Date;
-    /** false for a maintenance allocation (kind: 'block'), which uses the smaller
-     *  minMaintenanceBlockMin floor instead of minPlayBlockMin. */
-    hasTurnover: boolean;
-    /** Set when the allocation belongs to an active session: its start and lane are
-     *  already real (session.started_at is recorded) and cannot be dragged, though the
-     *  end may still move in either direction. */
-    locked?: { start: Date; laneId: string };
-  },
-  estimatorCfg: EstimatorConfig = DEFAULT_ESTIMATOR_CONFIG,
-): MoveCheck {
-  if (!(req.end.getTime() > req.start.getTime())) {
-    return { ok: false, reason: "end_before_start", conflicts: [] };
-  }
-
-  const minSpanMin = req.hasTurnover ? estimatorCfg.minPlayBlockMin : estimatorCfg.minMaintenanceBlockMin;
-  if (minutesBetween(req.start, req.end) < minSpanMin) {
-    return { ok: false, reason: "too_short", conflicts: [] };
-  }
-
-  if (req.start < snapshot.openAt) return { ok: false, reason: "before_open", conflicts: [] };
-  if (req.end > snapshot.closeAt) return { ok: false, reason: "after_close", conflicts: [] };
-
-  if (!snapshot.lanes.some((l) => l.id === req.laneId)) {
-    return { ok: false, reason: "unknown_lane", conflicts: [] };
-  }
-
-  if (req.locked) {
-    if (req.start.getTime() !== req.locked.start.getTime()) {
-      return { ok: false, reason: "locked_start", conflicts: [] };
-    }
-    if (req.laneId !== req.locked.laneId) {
-      return { ok: false, reason: "locked_lane", conflicts: [] };
-    }
-  }
-
-  const conflicts = snapshot.allocations.filter(
-    (a) => a.id !== req.allocationId && a.laneId === req.laneId && overlaps(a.start, a.end, req.start, req.end),
-  );
-  if (conflicts.length > 0) {
-    return { ok: false, reason: "lane_conflict", conflicts };
-  }
-
-  // No turnover component anywhere any more, so play_window is always the full span.
-  return { ok: true, end: req.end, playEnd: req.end };
 }
 
 /** How far either side of the requested time to look for a slot. */
