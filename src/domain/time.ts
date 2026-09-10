@@ -1,10 +1,10 @@
 /**
  * Time helpers. Pure — no I/O, no implicit `now`.
  *
- * Everything is stored as UTC `timestamptz` and rendered in venue-local time. The one
- * subtlety worth its own function is the business date: an alley open past midnight has
- * sessions at 00:30 that belong to the *previous* trading day, so "today's bookings" is
- * never `date_trunc('day', ...)`.
+ * Everything is stored as UTC `timestamptz` and rendered in venue-local time. The
+ * business-date rollover (an alley open past midnight has sessions at 00:30 that
+ * belong to the *previous* trading day) lives in src/domain/hours.ts, not here --
+ * it depends on per-weekday opening hours, which this module knows nothing about.
  */
 
 const MS_PER_DAY = 86_400_000;
@@ -38,26 +38,17 @@ export function zonedParts(instant: Date, timeZone: string): ZonedParts {
   };
 }
 
-/**
- * The venue trading day an instant belongs to, as 'YYYY-MM-DD'.
- *
- * Anything before `rolloverHour` in venue-local time is counted as the previous day, so a
- * session starting 00:30 Sunday lands on Saturday's business date.
- */
-export function businessDate(instant: Date, timeZone: string, rolloverHour: number): string {
-  const p = zonedParts(instant, timeZone);
-
-  // Pure calendar arithmetic on the local Y-M-D triple; UTC is used only as a safe
-  // vehicle for "subtract one day" and never reinterpreted as a real instant.
-  let ms = Date.UTC(p.year, p.month - 1, p.day);
-  if (p.hour < rolloverHour) ms -= MS_PER_DAY;
-
-  return formatDateUTC(new Date(ms));
-}
-
 function formatDateUTC(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
+/** The venue-local *calendar* date of `instant` as 'YYYY-MM-DD' -- the raw day on the
+ *  wall calendar, with no business-day rollover applied. businessDateFor() in
+ *  src/domain/hours.ts is this plus the per-weekday rollover rule. */
+export function zonedDateString(instant: Date, timeZone: string): string {
+  const p = zonedParts(instant, timeZone);
+  return formatDateUTC(new Date(Date.UTC(p.year, p.month - 1, p.day)));
 }
 
 /** Adds (or, with a negative count, subtracts) whole days to a 'YYYY-MM-DD' business
@@ -68,15 +59,27 @@ export function addDays(dateStr: string, days: number): string {
   return formatDateUTC(new Date(Date.UTC(year, month - 1, day) + days * MS_PER_DAY));
 }
 
+/** Whole days from `fromDateStr` to `toDateStr`, both 'YYYY-MM-DD'. The sibling of
+ *  addDays(): `addDays(a, daysBetween(a, b)) === b`. Pure calendar arithmetic, so it
+ *  is immune to DST -- the inputs are dates, not instants. */
+export function daysBetween(fromDateStr: string, toDateStr: string): number {
+  const [fy, fm, fd] = fromDateStr.split("-").map(Number) as [number, number, number];
+  const [ty, tm, td] = toDateStr.split("-").map(Number) as [number, number, number];
+  return (Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / MS_PER_DAY;
+}
+
 /**
  * The UTC instant corresponding to a given hour:minute, on a given business date, in
  * venue-local wall-clock time. E.g. zonedInstant("2026-09-12", 10, "Asia/Kolkata") is the
  * UTC instant that displays as 10:00 AM in Kolkata that day (India is UTC+5:30 -- not a
  * whole hour, so this can't be done with a fixed offset). `minute` defaults to 0.
  *
- * `hour` may exceed 23: a venue closing at 4am is stored as closes_at_hour = 28 (hours
- * since midnight of the opening day), and Date.UTC normalizes hour 28 into the next
- * calendar day, so zonedInstant("2026-09-12", 28, tz) is simply 4:00 AM on the 13th.
+ * `hour` may exceed 23: a venue closing at 4am past midnight is expressed as hour 28
+ * (hours since midnight of the opening day -- see src/domain/hours.ts), and Date.UTC
+ * normalizes hour 28 into the next calendar day, so zonedInstant("2026-09-12", 28, tz)
+ * is simply 4:00 AM on the 13th.
+ * The same normalization applies to `minute`, so a caller working in minutes-since-
+ * midnight (see zonedInstantAtMinute below) can likewise pass a value past 1439.
  *
  * Standard double-conversion trick: guess the instant naively (as if the local time were
  * UTC), see what that guess actually displays as in the target zone, then correct by the
@@ -96,11 +99,12 @@ export function zonedInstant(businessDate: string, hour: number, timeZone: strin
   return new Date(guess.getTime() + (wantedMs - gotMs));
 }
 
-/** The business-day boundary implied by closing time: an alley closing at 4am (hour 28)
- *  rolls over at 4am, so a 00:30 session still belongs to last night. An alley that closes
- *  by midnight (hour <= 24) has no post-midnight hours at all, so the boundary is 0. */
-export function rolloverHour(closesAtHour: number): number {
-  return Math.max(0, closesAtHour - 24);
+/** zonedInstant() with the wall-clock time expressed as minutes since midnight -- the
+ *  convention venue_hours and rate windows use. `min` may exceed 1439 for a close past
+ *  midnight (a 2am close is 1560); Date.UTC normalizes it, exactly as zonedInstant's
+ *  `hour` parameter normalizes an hour past 23. */
+export function zonedInstantAtMinute(dateStr: string, min: number, timeZone: string): Date {
+  return zonedInstant(dateStr, 0, timeZone, min);
 }
 
 export function addMinutes(instant: Date, minutes: number): Date {

@@ -15,8 +15,16 @@ describe("[unit][customer] booking server actions", () => {
   });
 
   it("does not query availability for malformed or impossible search input", async () => {
-    await expect(findTimes({ players: 25, games: 2, dateStr: "2026-09-12", hourStr: "19:00" })).resolves.toEqual([]);
-    await expect(findTimes({ players: 4, games: 2, dateStr: "2026-02-29", hourStr: "19:00" })).resolves.toEqual([]);
-    await expect(findTimes({ players: 4, games: 2, dateStr: "2026-09-12", hourStr: "24:00" })).resolves.toEqual([]);
+    // Each of these fails validation before findTimes() ever calls getVenue(), which is
+    // what lets this test run without a database -- see the ordering comment in actions.ts.
+    await expect(findTimes({ players: 25, games: 2, dateStr: "2026-09-12", hourStr: "19:00" })).resolves.toEqual({
+      status: "invalid",
+    });
+    await expect(findTimes({ players: 4, games: 2, dateStr: "2026-02-29", hourStr: "19:00" })).resolves.toEqual({
+      status: "invalid",
+    });
+    await expect(findTimes({ players: 4, games: 2, dateStr: "2026-09-12", hourStr: "24:00" })).resolves.toEqual({
+      status: "invalid",
+    });
   });
 });

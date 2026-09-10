@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isWithinBookingWindow,
+  MAX_BOOKING_GAMES,
   MAX_CUSTOMER_NAME_LENGTH,
   parseBookingStart,
   parseCustomerSearchDate,
@@ -31,10 +32,12 @@ describe("[unit][validation] customer booking input", () => {
       [25, 1],
       [4, 0],
       [4, 1.5],
+      [4, MAX_BOOKING_GAMES + 1],
     ] as const) {
       expect(validateBookingRequest(players, games)).not.toBeNull();
     }
     expect(validateBookingRequest(24, 1)).toBeNull();
+    expect(validateBookingRequest(4, MAX_BOOKING_GAMES)).toBeNull();
   });
 
   it("requires an exact ten-digit phone number", () => {

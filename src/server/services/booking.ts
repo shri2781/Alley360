@@ -8,9 +8,13 @@ import { tstzrangeLiteral } from "../../db/range";
 import { booking, laneAllocation } from "../../db/schema";
 import { DEFAULT_ESTIMATOR_CONFIG } from "../../domain/config";
 import { estimateDuration } from "../../domain/estimator";
+import { businessDateFor, hoursForDate, offsetMinutes } from "../../domain/hours";
+import { priceFor, resolveRate } from "../../domain/rates";
 import { checkSlot } from "../../domain/scheduler";
-import { addMinutes, businessDate, rolloverHour } from "../../domain/time";
-import { getAvailability, loadSnapshot, type AvailabilityRequest, type Venue } from "./availability";
+import { addMinutes } from "../../domain/time";
+import { getRateSchedule } from "../rates";
+import type { Venue } from "../venue";
+import { getAvailability, loadSnapshot, type AvailabilityRequest } from "./availability";
 
 const PG_EXCLUSION_VIOLATION = "23P01";
 
@@ -36,11 +40,38 @@ export class BookingConflictError extends Error {
   }
 }
 
+/** The venue is not open on the business date this request resolved to. Distinct
+ *  from NoAvailabilityError (which means "open, but every lane is busy") so callers
+ *  can give a truthful message instead of implying a lane might free up. */
+export class VenueClosedError extends Error {
+  constructor(readonly businessDate: string) {
+    super(`the venue is closed on ${businessDate}`);
+  }
+}
+
 export type CreateBookingInput = AvailabilityRequest & {
   source: "walkin" | "phone" | "staff" | "web";
   customerName?: string;
   customerPhone?: string;
 };
+
+type PricedBooking = { rateId: string; rateName: string; pricePerPerson: number; totalPrice: number };
+
+/** Resolves and prices the rate that applies to a session starting at `start`, on
+ *  the given business date. Priced from the START instant only -- see the `rate`
+ *  table's banner comment in schema.sql for why. */
+async function priceBooking(venue: Venue, businessDate: string, start: Date, players: number, games: number): Promise<PricedBooking> {
+  const day = hoursForDate(venue.weeklyHours, businessDate);
+  const offset = offsetMinutes(start, venue.timezone, businessDate);
+  const schedule = await getRateSchedule(venue.id);
+  const resolved = resolveRate(schedule, day, offset);
+  return {
+    rateId: resolved.id,
+    rateName: resolved.name,
+    pricePerPerson: resolved.pricePerPerson,
+    totalPrice: priceFor(resolved, players, games),
+  };
+}
 
 /**
  * Picks the slot nearest the requested time and books it atomically.
@@ -54,11 +85,18 @@ export async function createBooking(venue: Venue, input: CreateBookingInput) {
   const MAX_ATTEMPTS = 3;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const candidates = await getAvailability(venue, input, estimatorCfg);
-    const best = candidates[0];
+    const availability = await getAvailability(venue, input, estimatorCfg);
+    if (availability.status === "closed") throw new VenueClosedError(availability.businessDate);
+
+    const best = availability.candidates[0];
     if (!best) throw new NoAvailabilityError();
 
     const estimate = estimateDuration(input.players, input.games, estimatorCfg);
+    // Recomputed from best.start, not availability.businessDate: findCandidates() can
+    // return a start a little either side of preferredStart, and near a rollover
+    // boundary that can land on a different business day than preferredStart did.
+    const bDate = businessDateFor(best.start, venue.timezone, venue.weeklyHours);
+    const priced = await priceBooking(venue, bDate, best.start, input.players, input.games);
 
     try {
       return await db.transaction(async (tx) => {
@@ -73,11 +111,15 @@ export async function createBooking(venue: Venue, input: CreateBookingInput) {
             customerPhone: input.customerPhone,
             partySize: input.players,
             games: input.games,
-            businessDate: businessDate(best.start, venue.timezone, rolloverHour(venue.closesAtHour)),
+            businessDate: bDate,
             scheduledStart: best.start,
             estimatedBaseMin: estimate.baseMin,
             estimatedPlayMin: estimate.playMin,
             estimatedOccupyMin: estimate.occupyMin,
+            rateId: priced.rateId,
+            rateName: priced.rateName,
+            pricePerPerson: priced.pricePerPerson,
+            totalPrice: priced.totalPrice,
           })
           .returning();
 
@@ -115,13 +157,16 @@ export async function createBooking(venue: Venue, input: CreateBookingInput) {
  */
 export async function bookSpecificSlot(venue: Venue, input: CreateBookingInput, chosenStart: Date) {
   const estimatorCfg = DEFAULT_ESTIMATOR_CONFIG;
-  const bDate = businessDate(chosenStart, venue.timezone, rolloverHour(venue.closesAtHour));
+  const bDate = businessDateFor(chosenStart, venue.timezone, venue.weeklyHours);
 
   const snapshot = await loadSnapshot(venue, bDate);
+  if (!snapshot) throw new VenueClosedError(bDate);
+
   const slot = checkSlot(snapshot, chosenStart, input, estimatorCfg, new Date());
   if (!slot) throw new NoAvailabilityError();
 
   const estimate = estimateDuration(input.players, input.games, estimatorCfg);
+  const priced = await priceBooking(venue, bDate, chosenStart, input.players, input.games);
 
   try {
     return await db.transaction(async (tx) => {
@@ -141,6 +186,10 @@ export async function bookSpecificSlot(venue: Venue, input: CreateBookingInput, 
           estimatedBaseMin: estimate.baseMin,
           estimatedPlayMin: estimate.playMin,
           estimatedOccupyMin: estimate.occupyMin,
+          rateId: priced.rateId,
+          rateName: priced.rateName,
+          pricePerPerson: priced.pricePerPerson,
+          totalPrice: priced.totalPrice,
         })
         .returning();
 
@@ -195,9 +244,11 @@ export async function blockLane(venue: Venue, laneId: string, from: Date, to: Da
         kind: "block",
         status: "confirmed",
         source: "staff",
-        businessDate: businessDate(from, venue.timezone, rolloverHour(venue.closesAtHour)),
+        businessDate: businessDateFor(from, venue.timezone, venue.weeklyHours),
         scheduledStart: from,
         notes: reason,
+        // No price columns -- a block carries no party, see the booking_price_nonnegative
+        // comment in schema.sql.
       })
       .returning();
 

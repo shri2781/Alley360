@@ -1,22 +1,16 @@
 import Link from "next/link";
+import { formatWeekSummary, type WeeklyHours } from "../../../domain/hours";
 import styles from "./SiteFooter.module.css";
 
-function formatHour(hour: number): string {
-  const h = hour % 24;
-  const period = h < 12 ? "AM" : "PM";
-  const display = h % 12 === 0 ? 12 : h % 12;
-  return `${display} ${period}`;
-}
-
-export function SiteFooter({ venueName, opensAtHour, closesAtHour }: { venueName: string; opensAtHour: number; closesAtHour: number }) {
-  const hours = `${formatHour(opensAtHour)} – ${formatHour(closesAtHour)}`;
+export function SiteFooter({ venueName, weeklyHours }: { venueName: string; weeklyHours: WeeklyHours }) {
+  const hours = formatWeekSummary(weeklyHours);
 
   return (
     <footer id="contact" className={styles.footer}>
       <div className={styles.inner}>
         <div className={styles.brand}>
           <span className={styles.name}>{venueName}</span>
-          <span className={styles.hours}>Open daily · {hours}</span>
+          <span className={styles.hours}>{hours}</span>
         </div>
 
         <div className={styles.info}>

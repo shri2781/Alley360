@@ -7,8 +7,12 @@ vi.mock("../../db/client", () => ({
 }));
 
 import { moveAllocation } from "./allocation";
+import type { DayHours, WeeklyHours } from "../../domain/hours";
+import type { Venue } from "../venue";
 
-const VENUE = { id: "V1", timezone: "UTC", opensAtHour: 10, closesAtHour: 22 };
+const DAY: DayHours = { dayOfWeek: 0, isClosed: false, opensAtMin: 600, closesAtMin: 1320 };
+const WEEKLY_HOURS = Array.from({ length: 7 }, (_, dayOfWeek) => ({ ...DAY, dayOfWeek })) as unknown as WeeklyHours;
+const VENUE: Venue = { id: "V1", name: "Test Venue", timezone: "UTC", weeklyHours: WEEKLY_HOURS };
 const OCCUPIES = "[2026-09-12T14:00:00.000Z,2026-09-12T16:00:00.000Z)";
 
 function txFor(status: "confirmed" | "active") {

@@ -178,51 +178,6 @@
   text-align: center;
 }
 
-/* ---------- Packages ---------- */
-
-.packageGrid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--sp-3);
-}
-
-.packageCard {
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  padding: var(--sp-4);
-  cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
-}
-
-.packageCard:hover {
-  border-color: var(--accent-2);
-}
-
-.packageCardSelected {
-  border-color: var(--accent-2);
-  background: linear-gradient(180deg, rgba(236, 21, 97, 0.12), var(--bg) 60%);
-}
-
-.packageName {
-  font-weight: 800;
-}
-
-.packageMeta {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-
-.packagePrice {
-  font-weight: 700;
-  color: var(--accent-2);
-}
-
 /* ---------- Times ---------- */
 
 .timeGrid {
@@ -233,7 +188,13 @@
 }
 
 .timeBtn {
-  min-height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: var(--sp-2);
   border-radius: var(--r-sm);
   border: 1px solid var(--border);
   background: var(--bg);
@@ -251,6 +212,21 @@
   border-color: var(--accent-2);
   background: var(--accent-gradient);
   color: #fff;
+}
+
+.timeBtnLabel {
+  font-weight: 700;
+}
+
+.timeBtnMeta {
+  font-weight: 500;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.timeBtnSelected .timeBtnMeta {
+  color: inherit;
+  opacity: 0.85;
 }
 
 .timeSkeleton {
@@ -389,10 +365,6 @@
 /* ---------- Breakpoints ---------- */
 
 @media (min-width: 480px) {
-  .packageGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
   .timeGrid {
     grid-template-columns: repeat(3, 1fr);
   }

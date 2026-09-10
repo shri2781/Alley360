@@ -1,9 +1,6 @@
 /** Shared display formatting for the customer site -- kept out of page.tsx so both
- *  the landing page and (if needed later) other customer pages format the same way. */
-
-export function formatHour(hour: number): string {
-  const h = hour % 24;
-  const period = h < 12 ? "AM" : "PM";
-  const display = h % 12 === 0 ? 12 : h % 12;
-  return `${display} ${period}`;
-}
+ *  the landing page and (if needed later) other customer pages format the same way.
+ *  Re-exported from the domain layer rather than re-implemented here -- see
+ *  src/domain/hours.ts, which is unit-tested. */
+export { formatDayList, formatDayWindow, formatMinuteOfDay, formatWeekSummary } from "../../domain/hours";
+export { formatSpecialWindow } from "../../domain/rates";

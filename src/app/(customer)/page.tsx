@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { getActivePackages } from "../../server/packages";
 import { getActiveLaneCount } from "../../server/lanes";
+import { getRateSchedule } from "../../server/rates";
 import { getVenue } from "../../server/venue";
+import { businessDateFor, hoursForDate } from "../../domain/hours";
 import { PhotoCard } from "./_components/PhotoCard";
 import { Reveal } from "./_components/Reveal";
 import btn from "./_components/Button.module.css";
-import { formatHour } from "./format";
+import { formatDayList, formatDayWindow, formatSpecialWindow } from "./format";
 import styles from "./landing.module.css";
 
 import heroPhoto from "../../assets/photos/hero-alley.jpg";
@@ -58,16 +59,20 @@ const GALLERY = [
 
 export default async function LandingPage() {
   const venue = await getVenue();
-  const [packages, laneCount] = await Promise.all([
-    getActivePackages(venue.id),
-    getActiveLaneCount(venue.id),
-  ]);
-  const hours = `${formatHour(venue.opensAtHour)} – ${formatHour(venue.closesAtHour)}`;
+  const [schedule, laneCount] = await Promise.all([getRateSchedule(venue.id), getActiveLaneCount(venue.id)]);
+
+  const todayStr = businessDateFor(new Date(), venue.timezone, venue.weeklyHours);
+  const today = hoursForDate(venue.weeklyHours, todayStr);
+  const todayHours = formatDayWindow(today);
+  const heroPill = today.isClosed ? "Closed today" : `Open today · ${todayHours}`;
+
+  const allRates = [schedule.base, ...schedule.specials];
+  const minPrice = Math.min(...allRates.map((r) => r.pricePerPerson));
 
   const stats = [
     { photo: laneDarkPhoto, value: String(laneCount), label: laneCount === 1 ? "Bowling Lane" : "Bowling Lanes" },
-    { photo: ballReturnPhoto, value: String(packages.length), label: packages.length === 1 ? "Package" : "Packages" },
-    { photo: shoesFloorPhoto, value: hours, label: "Open Daily" },
+    { photo: ballReturnPhoto, value: `₹${minPrice}`, label: "From / Game" },
+    { photo: shoesFloorPhoto, value: todayHours, label: "Today's Hours" },
   ];
 
   return (
@@ -83,7 +88,7 @@ export default async function LandingPage() {
         />
         <div className={styles.heroScrim} />
         <div className={styles.heroContent}>
-          <span className={styles.heroPill}>Open today · {hours}</span>
+          <span className={styles.heroPill}>{heroPill}</span>
           <div className={styles.heroKicker}>Roll &bull; Play &bull; Party</div>
           <h1 className={styles.heroTitle}>
             The Ultimate <span className={styles.heroTitleAccent}>Bowling Experience</span>
@@ -93,8 +98,8 @@ export default async function LandingPage() {
             <Link href="/book" className={btn.btnPrimary}>
               Book a Lane
             </Link>
-            <a href="#packages" className={btn.btnGhost}>
-              See Packages
+            <a href="#rates" className={btn.btnGhost}>
+              See Rates
             </a>
           </div>
         </div>
@@ -112,36 +117,45 @@ export default async function LandingPage() {
         ))}
       </Reveal>
 
-      <section id="packages" className={styles.section}>
+      <section id="rates" className={styles.section}>
         <Reveal>
           <div className={styles.sectionHeading}>
-            <h2 className={styles.sectionTitle}>Our Packages</h2>
-            <p className={styles.sectionSubtitle}>Choose from our flexible packages for every kind of bowler</p>
+            <h2 className={styles.sectionTitle}>Our Rates</h2>
+            <p className={styles.sectionSubtitle}>Simple per-game pricing &mdash; cheaper at Happy Hours, before you even ask</p>
           </div>
         </Reveal>
 
         <div className={styles.packageGrid}>
-          {packages.map((p, i) => {
-            const featured = packages.length > 2 && i === Math.floor(packages.length / 2);
-            return (
-              <Reveal key={p.id} delayMs={i * 60}>
-                <div className={`${styles.packageCard} ${featured ? styles.packageCardFeatured : ""}`}>
-                  {featured && <span className={styles.packageBadge}>Most Popular</span>}
-                  <span className={styles.packageName}>{p.name}</span>
-                  <span className={styles.packageGames}>
-                    {p.games} game{p.games === 1 ? "" : "s"}
-                  </span>
-                  <div className={styles.packagePrice}>
-                    &#8377;{p.pricePerPerson} <span className={styles.packagePriceUnit}>/ person</span>
-                  </div>
-                  <Link href="/book" className={`${btn.btnPrimary} ${btn.btnBlock}`}>
-                    Book Now
-                  </Link>
+          <Reveal>
+            <div className={styles.packageCard}>
+              <span className={styles.packageName}>{schedule.base.name}</span>
+              <span className={styles.packageMeta}>Every day, any time</span>
+              <div className={styles.packagePrice}>
+                &#8377;{schedule.base.pricePerPerson} <span className={styles.packagePriceUnit}>/ person / game</span>
+              </div>
+            </div>
+          </Reveal>
+          {schedule.specials.map((s, i) => (
+            <Reveal key={s.id} delayMs={(i + 1) * 60}>
+              <div className={`${styles.packageCard} ${styles.packageCardFeatured}`}>
+                <span className={styles.packageBadge}>Special</span>
+                <span className={styles.packageName}>{s.name}</span>
+                <span className={styles.packageMeta}>
+                  {formatDayList(s.days)} &middot; {formatSpecialWindow(s)}
+                </span>
+                <div className={styles.packagePrice}>
+                  &#8377;{s.pricePerPerson} <span className={styles.packagePriceUnit}>/ person / game</span>
                 </div>
-              </Reveal>
-            );
-          })}
+              </div>
+            </Reveal>
+          ))}
         </div>
+
+        <Reveal>
+          <Link href="/book" className={`${btn.btnPrimary} ${btn.btnBlock}`}>
+            Book Now
+          </Link>
+        </Reveal>
       </section>
 
       <section id="how-it-works" className={styles.section}>

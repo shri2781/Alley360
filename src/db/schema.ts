@@ -10,6 +10,8 @@ import {
   integer,
   pgEnum,
   pgTable,
+  primaryKey,
+  smallint,
   text,
   timestamp,
   unique,
@@ -44,10 +46,29 @@ export const tenant = pgTable("tenant", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   timezone: text("timezone").notNull(),
-  opensAtHour: integer("opens_at_hour").notNull().default(10),
-  closesAtHour: integer("closes_at_hour").notNull().default(22),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** One row per weekday (0=Sunday..6=Saturday). See the schema.sql banner comment
+ *  above this table for the full convention -- times are minutes since venue-local
+ *  midnight of the opening day. */
+export const venueHours = pgTable(
+  "venue_hours",
+  {
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenant.id, { onDelete: "cascade" }),
+    /** 0 = Sunday .. 6 = Saturday -- JS getUTCDay() / PG EXTRACT(DOW). */
+    dayOfWeek: smallint("day_of_week").notNull(),
+    isClosed: boolean("is_closed").notNull().default(false),
+    /** Minutes since venue-local midnight OF THE OPENING DAY: a 2am close is 1560. */
+    opensAtMin: integer("opens_at_min").notNull().default(600),
+    closesAtMin: integer("closes_at_min").notNull().default(1320),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.tenantId, t.dayOfWeek] }),
+  }),
+);
 
 export const lane = pgTable(
   "lane",
@@ -65,21 +86,31 @@ export const lane = pgTable(
   }),
 );
 
-export const pkg = pgTable(
-  "package",
+/** See the schema.sql banner comment above this table for the full convention:
+ *  base + ordered special overrides, half-open windows, business-day `days`. */
+export const rate = pgTable(
+  "rate",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenant.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
-    games: integer("games").notNull(),
+    /** Per person PER GAME. Total = this x games x players. */
     pricePerPerson: integer("price_per_person").notNull(),
-    sortOrder: integer("sort_order").notNull().default(0),
+    isBase: boolean("is_base").notNull().default(false),
+    /** 0=Sun..6=Sat, of the BUSINESS date. NULL on the base row. Filtered in JS,
+     *  never with a Postgres array operator -- see src/server/rates.ts. */
+    days: smallint("days").array(),
+    startsAtMin: integer("starts_at_min"),
+    endsAtMin: integer("ends_at_min"),
+    priority: integer("priority").notNull().default(0),
     isActive: boolean("is_active").notNull().default(true),
   },
   (t) => ({
-    tenantIdx: index("package_tenant_idx").on(t.tenantId, t.isActive, t.sortOrder),
+    tenantIdx: index("rate_tenant_idx").on(t.tenantId, t.isActive, t.priority),
+    // rate_one_base_idx (a partial unique index) lives only in schema.sql --
+    // Drizzle's index builder can't express a WHERE clause.
   }),
 );
 
@@ -107,6 +138,13 @@ export const booking = pgTable(
     estimatedBaseMin: integer("estimated_base_min").notNull().default(0),
     estimatedPlayMin: integer("estimated_play_min").notNull().default(0),
     estimatedOccupyMin: integer("estimated_occupy_min").notNull().default(0),
+
+    // Price as agreed at booking time -- snapshotted, not joined. NULL on blocks.
+    // See the schema.sql banner comment on this table for why.
+    rateId: uuid("rate_id").references(() => rate.id, { onDelete: "set null" }),
+    rateName: text("rate_name"),
+    pricePerPerson: integer("price_per_person"),
+    totalPrice: integer("total_price"),
 
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

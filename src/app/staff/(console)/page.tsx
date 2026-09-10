@@ -35,6 +35,13 @@ export default async function LaneAllotmentPage({
         <AddWalkInButton error={error} />
       </div>
 
+      {data.isClosedToday && (
+        <p className={styles.errorBanner}>
+          The alley is marked closed today in Alley Timings. Showing the full day so any existing bookings stay
+          visible -- walk-ins will be turned away until hours are updated in Settings.
+        </p>
+      )}
+
       <div className={styles.statsRow}>
         <div className={styles.statCard}>
           <div className={styles.statLabel}>Total Lanes</div>

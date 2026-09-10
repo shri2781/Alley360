@@ -16,14 +16,21 @@
  *     move normally reflects a real change to the agreement ("customer rang and asked
  *     for 8pm"). For a booking holding several lanes it is the MINIMUM start across its
  *     surviving allocations -- one column cannot track several lanes independently.
+ *
+ *   - `booking.rate_id`/`rate_name`/`price_per_person`/`total_price` are likewise NEVER
+ *     rewritten here. The snapshotted price is what the customer agreed to when they
+ *     booked; silently repricing them (up OR down) as a side effect of a staff drag for
+ *     scheduling convenience would be worse than the price going stale. If repricing a
+ *     moved booking is ever wanted, it should be its own explicit staff action, not a
+ *     side effect of this one.
  */
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../../db/client";
 import { parseTstzrange, tstzrangeLiteral } from "../../db/range";
 import { booking, laneAllocation } from "../../db/schema";
-import { businessDate, rolloverHour } from "../../domain/time";
+import { businessDateFor } from "../../domain/hours";
+import { type Venue } from "../venue";
 import { isExclusionViolation } from "./booking";
-import { type Venue } from "./availability";
 
 export type MoveFailure = "end_before_start" | "not_found" | "released" | "conflict";
 
@@ -96,7 +103,7 @@ export async function moveAllocation(venue: Venue, input: MoveAllocationInput) {
           scheduledStart: earliest,
           // A dragged block can cross the venue's rollover hour into a different
           // business day.
-          businessDate: businessDate(earliest, venue.timezone, rolloverHour(venue.closesAtHour)),
+          businessDate: businessDateFor(earliest, venue.timezone, venue.weeklyHours),
         })
         .where(eq(booking.id, row.booking.id));
 

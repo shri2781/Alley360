@@ -2,7 +2,7 @@
 --
 -- This file is the SOURCE OF TRUTH for the database. `src/db/schema.ts` mirrors it
 -- for typed queries and must be kept in sync by hand. That is a deliberate choice
--- for a 5-table prototype: exclusion constraints and tstzrange are painful to express
+-- for a small prototype: exclusion constraints and tstzrange are painful to express
 -- through a migration generator, and one hand-written file is less machinery than
 -- drizzle-kit plus a separate raw migration for the constraint.
 --
@@ -30,12 +30,54 @@ CREATE TABLE tenant (
   id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name               text        NOT NULL,
   timezone           text        NOT NULL,              -- IANA, e.g. 'Asia/Kolkata'
-  opens_at_hour      int         NOT NULL DEFAULT 10,   -- venue-local hour bookings can start from
-  closes_at_hour     int         NOT NULL DEFAULT 22,   -- hours since midnight of the opening day: a 4am close is 28
-  created_at         timestamptz NOT NULL DEFAULT now(),
+  created_at         timestamptz NOT NULL DEFAULT now()
 
-  CONSTRAINT tenant_hours_valid CHECK (opens_at_hour BETWEEN 0 AND 23
-    AND closes_at_hour > opens_at_hour AND closes_at_hour <= opens_at_hour + 24)
+  -- Opening hours used to live here as a single opens_at_hour/closes_at_hour pair
+  -- for every day of the week. Replaced by the per-weekday `venue_hours` table below.
+);
+
+-- ---------------------------------------------------------------------------
+-- venue_hours — opening hours, one row per weekday. Exactly seven rows per
+-- tenant, enforced by the composite primary key plus the seed.
+--
+-- Times are MINUTES SINCE VENUE-LOCAL MIDNIGHT OF THE OPENING DAY, so a 2am
+-- close is 1560, not 120 -- the same "hours past midnight of the opening day"
+-- convention this schema used before per-weekday hours existed (a single
+-- closes_at_hour column, where a 4am close was 28), just at 30-minute
+-- resolution now. See src/domain/hours.ts for every function that reads this
+-- table.
+--
+-- A closed day KEEPS its opens/closes values so that un-checking "Closed" in
+-- Settings restores the previous times rather than losing them; is_closed is
+-- the only thing that makes a day closed.
+--
+-- NOT enforced here (cross-row, so it can't be a CHECK): a day's opens_at_min
+-- must not be earlier than the previous day finishes closing -- see
+-- validateWeeklyHours() in src/domain/hours.ts, applied by the settings
+-- action before this table is written.
+--
+-- Extension point for later: a one-off closure or holiday hours would need a
+-- venue_hours_override(tenant_id, date, ...) table checked ahead of this one.
+-- Not built -- out of scope for now.
+-- ---------------------------------------------------------------------------
+CREATE TABLE venue_hours (
+  tenant_id      uuid     NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  day_of_week    smallint NOT NULL,                    -- 0=Sunday .. 6=Saturday, matching JS getUTCDay() and PG EXTRACT(DOW)
+  is_closed      boolean  NOT NULL DEFAULT false,
+  opens_at_min   int      NOT NULL DEFAULT 600,        -- 10:00
+  closes_at_min  int      NOT NULL DEFAULT 1320,       -- 22:00
+
+  PRIMARY KEY (tenant_id, day_of_week),
+
+  CONSTRAINT venue_hours_dow_valid CHECK (day_of_week BETWEEN 0 AND 6),
+  CONSTRAINT venue_hours_window_valid CHECK (
+    opens_at_min BETWEEN 0 AND 1439
+    AND closes_at_min > opens_at_min
+    AND closes_at_min <= opens_at_min + 1440
+  ),
+  -- 30-minute granularity everywhere: the Settings selects, rate windows, and
+  -- this table all agree, so a rate boundary always lands on a real minute.
+  CONSTRAINT venue_hours_aligned CHECK (opens_at_min % 30 = 0 AND closes_at_min % 30 = 0)
 );
 
 -- ---------------------------------------------------------------------------
@@ -52,28 +94,76 @@ CREATE TABLE lane (
 );
 
 -- ---------------------------------------------------------------------------
--- package — display-only pricing tiers for the customer-facing site. Prices are
--- shown as "pay at venue" estimates; nothing here touches payments or the
--- scheduler. `booking.games` (not this table) stays the source of truth once a
--- booking exists — a package just supplies a starting `games` value in the UI.
--- Deliberately minimal: no booking_id/package_id link, no price snapshotting.
--- Real pricing logic is future work; this exists so the admin side has
--- somewhere to edit tiers instead of them being hardcoded HTML.
+-- rate — what a person pays per game, resolved from the time they start.
+--
+-- Replaces a `package` table that bundled a games count with a flat
+-- price-per-person and had no time dimension at all. A rate carries no games
+-- count: the customer picks their own games, and the price is per person PER
+-- GAME, so total = price_per_person x games x players.
+--
+-- Overlap resolution is base + ordered overrides:
+--   * exactly one is_base row per tenant (rate_one_base_idx). Always applies,
+--     has no days and no window, and cannot be deactivated (rate_base_shape).
+--   * every other row is a special: a set of weekdays plus an optional window.
+--     Checked in `priority` order, first match wins. Ties are impossible to
+--     resolve meaningfully, so the loader orders by (priority, name, id) and
+--     the pure resolver takes the first -- see resolveRate() in
+--     src/domain/rates.ts, which trusts that ordering rather than sorting.
+--
+-- Windows are half-open [starts_at_min, ends_at_min) in the SAME minutes-since-
+-- business-midnight space as venue_hours, so a "Late Night" rate may legally
+-- run 1320..1500 (10pm to 1am). NULL means "the venue's own boundary": NULL
+-- start = from opening, NULL end = until closing.
+--
+-- `days` is the day-of-week of the BUSINESS date, not the calendar date: a
+-- Friday rate covers 00:30 Saturday if Friday's window runs past midnight.
+--
+-- A booking is priced from its START instant only, not its span: a session
+-- starting inside Happy Hours is Happy-Hours-priced end to end.
+--
+-- `days` is filtered in application code (src/server/rates.ts), never with a
+-- Postgres array operator in a WHERE clause -- the rate list is a handful of
+-- rows per tenant, so there is no reason to push that logic into SQL.
 -- ---------------------------------------------------------------------------
-CREATE TABLE package (
-  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id         uuid NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
-  name              text NOT NULL,
-  games             int  NOT NULL,
-  price_per_person  int  NOT NULL,   -- smallest currency unit's whole number, e.g. rupees
-  sort_order        int  NOT NULL DEFAULT 0,
-  is_active         boolean NOT NULL DEFAULT true,
+CREATE TABLE rate (
+  id                uuid     PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id         uuid     NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
+  name              text     NOT NULL,
+  price_per_person  int      NOT NULL,   -- per person PER GAME, whole rupees
+  is_base           boolean  NOT NULL DEFAULT false,
+  days              smallint[],          -- 0=Sun..6=Sat; NULL on the base row
+  starts_at_min     int,                 -- NULL = from opening
+  ends_at_min       int,                 -- NULL = until closing; may exceed 1440
+  priority          int      NOT NULL DEFAULT 0,
+  is_active         boolean  NOT NULL DEFAULT true,
 
-  CONSTRAINT package_games_positive CHECK (games > 0),
-  CONSTRAINT package_price_nonnegative CHECK (price_per_person >= 0)
+  CONSTRAINT rate_price_nonnegative CHECK (price_per_person >= 0),
+
+  CONSTRAINT rate_base_shape CHECK (
+    NOT is_base
+    OR (days IS NULL AND starts_at_min IS NULL AND ends_at_min IS NULL AND is_active)
+  ),
+  CONSTRAINT rate_special_shape CHECK (
+    is_base
+    OR (days IS NOT NULL
+        AND days <@ '{0,1,2,3,4,5,6}'::smallint[]
+        AND array_length(days, 1) BETWEEN 1 AND 7)
+  ),
+  CONSTRAINT rate_window_valid CHECK (
+    (starts_at_min IS NULL OR starts_at_min BETWEEN 0 AND 1439)
+    AND (ends_at_min IS NULL OR ends_at_min BETWEEN 30 AND 2880)
+    AND (starts_at_min IS NULL OR ends_at_min IS NULL OR ends_at_min > starts_at_min)
+  ),
+  CONSTRAINT rate_window_aligned CHECK (
+    (starts_at_min IS NULL OR starts_at_min % 30 = 0)
+    AND (ends_at_min IS NULL OR ends_at_min % 30 = 0)
+  )
 );
 
-CREATE INDEX package_tenant_idx ON package (tenant_id, is_active, sort_order);
+-- At most one base per tenant. "At least one" is a seed + loader invariant:
+-- getRateSchedule() throws rather than silently pricing at zero.
+CREATE UNIQUE INDEX rate_one_base_idx ON rate (tenant_id) WHERE is_base;
+CREATE INDEX rate_tenant_idx ON rate (tenant_id, is_active, priority);
 
 -- ---------------------------------------------------------------------------
 -- booking — the commercial agreement. Deliberately also models maintenance:
@@ -94,7 +184,7 @@ CREATE TABLE booking (
   party_size            int NOT NULL DEFAULT 0,
   games                 int NOT NULL DEFAULT 0,
 
-  business_date         date        NOT NULL,   -- venue day, derived from closing hour (see rolloverHour in src/domain/time.ts)
+  business_date         date        NOT NULL,   -- venue day, derived per-weekday (see businessDateFor in src/domain/hours.ts)
   scheduled_start       timestamptz NOT NULL,
 
   -- The three duration quantities are distinct on purpose (see src/domain/config.ts):
@@ -105,12 +195,26 @@ CREATE TABLE booking (
   estimated_play_min    int NOT NULL DEFAULT 0,
   estimated_occupy_min  int NOT NULL DEFAULT 0,
 
+  -- Price as agreed at booking time. Snapshotted, not joined: editing a rate in
+  -- Settings must never silently reprice bookings that already exist, and
+  -- rate_name survives even if the rate row is later removed. A staff drag to a
+  -- different time deliberately does NOT reprice (see allocation.ts) -- the
+  -- quoted price is the quoted price. NULL on kind='block', which has no party.
+  rate_id               uuid REFERENCES rate(id) ON DELETE SET NULL,
+  rate_name             text,
+  price_per_person      int,   -- per person per game, copied from the rate
+  total_price           int,   -- price_per_person x games x party_size
+
   notes                 text,
   created_at            timestamptz NOT NULL DEFAULT now(),
 
   -- Blocks carry no party; open play always does.
   CONSTRAINT booking_party_valid
-    CHECK (kind = 'block' OR (party_size > 0 AND games > 0))
+    CHECK (kind = 'block' OR (party_size > 0 AND games > 0)),
+
+  CONSTRAINT booking_price_nonnegative
+    CHECK ((price_per_person IS NULL OR price_per_person >= 0)
+       AND (total_price IS NULL OR total_price >= 0))
 );
 
 CREATE INDEX booking_day_idx ON booking (tenant_id, business_date, status);

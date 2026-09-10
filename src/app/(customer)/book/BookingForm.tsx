@@ -4,30 +4,26 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import btn from "../_components/Button.module.css";
 import { confirmBooking, findTimes, type TimeOption } from "./actions";
-import { validateCustomerName } from "../../../domain/bookingInput";
+import { MAX_BOOKING_GAMES, validateCustomerName } from "../../../domain/bookingInput";
 import styles from "./book.module.css";
 
-export type PackageOption = {
-  id: string;
-  name: string;
-  games: number;
-  pricePerPerson: number;
-};
+/** "2026-09-14" -> "Sunday, Sep 14". Formatted in UTC -- the string is already a
+ *  venue-local business date, not an instant, so no timezone conversion applies. */
+function formatBusinessDate(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number) as [number, number, number];
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
 
-export function BookingForm({
-  packages,
-  minDate,
-  maxDate,
-}: {
-  packages: PackageOption[];
-  minDate: string;
-  maxDate: string;
-}) {
+export function BookingForm({ minDate, maxDate }: { minDate: string; maxDate: string }) {
   const router = useRouter();
 
   const [players, setPlayers] = useState(4);
-  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(packages[0]?.id ?? null);
-  const games = packages.find((p) => p.id === selectedPackageId)?.games ?? 1;
+  const [games, setGames] = useState(2);
 
   const [dateStr, setDateStr] = useState(minDate);
   const [hourStr, setHourStr] = useState("19:00");
@@ -55,11 +51,23 @@ export function BookingForm({
     setSearching(true);
     setErrorMsg(null);
     try {
-      const found = await findTimes({ players, games, dateStr, hourStr });
-      setTimes(found);
+      const result = await findTimes({ players, games, dateStr, hourStr });
       setSelectedTimeIso(null);
       setSearched(true);
-      if (found.length === 0) {
+
+      if (result.status === "invalid") {
+        setTimes([]);
+        setErrorMsg("Enter a valid date, time, and player/game count.");
+        return;
+      }
+      if (result.status === "closed") {
+        setTimes([]);
+        setErrorMsg(`The alley is closed on ${formatBusinessDate(result.businessDate)}. Try a different date.`);
+        return;
+      }
+
+      setTimes(result.times);
+      if (result.times.length === 0) {
         setErrorMsg("No lanes available near that time. Try a different time or date.");
       }
     } finally {
@@ -103,9 +111,7 @@ export function BookingForm({
     }
   }
 
-  const selectedPackage = packages.find((p) => p.id === selectedPackageId);
-  const selectedTimeLabel = times.find((t) => t.startIso === selectedTimeIso)?.label;
-  const total = selectedPackage ? selectedPackage.pricePerPerson * players : 0;
+  const selectedTime = times.find((t) => t.startIso === selectedTimeIso);
   const step3Unlocked = Boolean(selectedTimeIso);
 
   return (
@@ -113,7 +119,7 @@ export function BookingForm({
       <div className={styles.form}>
         <ol className={styles.stepRail} aria-hidden="true">
           <li className={`${styles.stepRailItem} ${styles.stepRailDone}`}>
-            <span className={styles.stepRailDot}>&#10003;</span> Players &amp; Package
+            <span className={styles.stepRailDot}>&#10003;</span> Players &amp; Games
           </li>
           <li className={`${styles.stepRailItem} ${step3Unlocked ? styles.stepRailDone : styles.stepRailActive}`}>
             <span className={styles.stepRailDot}>{step3Unlocked ? "✓" : "2"}</span> Date &amp; Time
@@ -124,7 +130,7 @@ export function BookingForm({
         </ol>
 
         <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>1. Players &amp; Package</h2>
+          <h2 className={styles.sectionTitle}>1. Players &amp; Games</h2>
           <label className={styles.field}>
             Number of players
             <div className={styles.stepper}>
@@ -156,29 +162,36 @@ export function BookingForm({
             </div>
           </label>
 
-          <div className={styles.field}>
-            Package
-            <div className={styles.packageGrid}>
-              {packages.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  aria-pressed={p.id === selectedPackageId}
-                  className={`${styles.packageCard} ${p.id === selectedPackageId ? styles.packageCardSelected : ""}`}
-                  onClick={() => {
-                    setSelectedPackageId(p.id);
-                    resetSearch();
-                  }}
-                >
-                  <span className={styles.packageName}>{p.name}</span>
-                  <span className={styles.packageMeta}>
-                    {p.games} game{p.games === 1 ? "" : "s"}
-                  </span>
-                  <span className={styles.packagePrice}>&#8377;{p.pricePerPerson}/person</span>
-                </button>
-              ))}
+          <label className={styles.field}>
+            Number of games
+            <div className={styles.stepper}>
+              <button
+                type="button"
+                className={styles.stepperBtn}
+                disabled={games <= 1}
+                aria-label="Fewer games"
+                onClick={() => {
+                  setGames((g) => Math.max(1, g - 1));
+                  resetSearch();
+                }}
+              >
+                &minus;
+              </button>
+              <span className={styles.stepperValue}>{games}</span>
+              <button
+                type="button"
+                className={styles.stepperBtn}
+                disabled={games >= MAX_BOOKING_GAMES}
+                aria-label="More games"
+                onClick={() => {
+                  setGames((g) => Math.min(MAX_BOOKING_GAMES, g + 1));
+                  resetSearch();
+                }}
+              >
+                +
+              </button>
             </div>
-          </div>
+          </label>
         </div>
 
         <form
@@ -240,7 +253,10 @@ export function BookingForm({
                   className={`${styles.timeBtn} ${t.startIso === selectedTimeIso ? styles.timeBtnSelected : ""}`}
                   onClick={() => setSelectedTimeIso(t.startIso)}
                 >
-                  {t.label}
+                  <span className={styles.timeBtnLabel}>{t.label}</span>
+                  <span className={styles.timeBtnMeta}>
+                    {t.rateName} &middot; &#8377;{t.totalPrice}
+                  </span>
                 </button>
               ))}
             </div>
@@ -305,8 +321,8 @@ export function BookingForm({
           <strong>{players}</strong>
         </div>
         <div className={styles.summaryRow}>
-          <span>Package</span>
-          <strong>{selectedPackage ? `${selectedPackage.name} (${selectedPackage.games}g)` : "—"}</strong>
+          <span>Games</span>
+          <strong>{games}</strong>
         </div>
         <div className={styles.summaryRow}>
           <span>Date</span>
@@ -314,21 +330,29 @@ export function BookingForm({
         </div>
         <div className={styles.summaryRow}>
           <span>Time</span>
-          <strong>{selectedTimeLabel ?? "Not selected yet"}</strong>
+          <strong>{selectedTime?.label ?? "Not selected yet"}</strong>
         </div>
+        {selectedTime && (
+          <div className={styles.summaryRow}>
+            <span>Rate</span>
+            <strong>{selectedTime.rateName}</strong>
+          </div>
+        )}
         <div className={styles.summaryTotal}>
           <span className={styles.summaryTotalLabel}>Total</span>
-          <span className={styles.summaryTotalValue}>&#8377;{total}</span>
+          <span className={styles.summaryTotalValue}>{selectedTime ? `₹${selectedTime.totalPrice}` : "—"}</span>
         </div>
-        <p className={styles.summaryNote}>Pay at the venue. Lane assigned automatically.</p>
+        <p className={styles.summaryNote}>
+          {selectedTime ? "Pay at the venue. Lane assigned automatically." : "Select a time to see your price."}
+        </p>
       </aside>
 
       <div className={styles.mobileBar} aria-hidden="true">
         <div className={styles.mobileBarInfo}>
-          <span className={styles.mobileBarTime}>{selectedTimeLabel ?? `${players} players`}</span>
-          <span className={styles.mobileBarSub}>{selectedPackage?.name ?? "Pick a package"}</span>
+          <span className={styles.mobileBarTime}>{selectedTime?.label ?? `${players} players, ${games} games`}</span>
+          <span className={styles.mobileBarSub}>{selectedTime?.rateName ?? "Pick a time"}</span>
         </div>
-        <span className={styles.mobileBarTotal}>&#8377;{total}</span>
+        <span className={styles.mobileBarTotal}>{selectedTime ? `₹${selectedTime.totalPrice}` : "—"}</span>
       </div>
     </div>
   );

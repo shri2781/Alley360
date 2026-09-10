@@ -8,7 +8,7 @@
  */
 import { eq } from "drizzle-orm";
 import { db, sql } from "../src/db/client.js";
-import { booking, lane, tenant } from "../src/db/schema.js";
+import { booking, lane } from "../src/db/schema.js";
 import { zonedInstant } from "../src/domain/time.js";
 import {
   blockLane,
@@ -16,8 +16,9 @@ import {
   createBooking,
   NoAvailabilityError,
 } from "../src/server/services/booking.js";
-import { getAvailability, type Venue } from "../src/server/services/availability.js";
+import { getAvailability } from "../src/server/services/availability.js";
 import { endSession, startSession } from "../src/server/services/session.js";
+import { getVenue } from "../src/server/venue.js";
 
 let failures = 0;
 function check(ok: boolean, label: string) {
@@ -26,9 +27,7 @@ function check(ok: boolean, label: string) {
 }
 
 async function main() {
-  const [venueRow] = await db.select().from(tenant).limit(1);
-  if (!venueRow) throw new Error("no tenant -- run `npm run db:reset` first");
-  const venue: Venue = venueRow;
+  const venue = await getVenue();
 
   const lanes = await db.select().from(lane).where(eq(lane.tenantId, venue.id));
   if (lanes.length < 4) throw new Error("expected at least 4 seeded lanes");
@@ -37,11 +36,13 @@ async function main() {
   const day = "2026-09-14";
   const preferredStart = zonedInstant(day, 14, venue.timezone); // 2 PM venue-local
 
-  console.log(`\nBooking service demo -- ${venueRow.name} (${venue.timezone})\n`);
+  console.log(`\nBooking service demo -- ${venue.name} (${venue.timezone})\n`);
 
   // 1. Availability, before anything exists.
   const availability = await getAvailability(venue, { players: 4, games: 2, preferredStart });
-  check(availability.length > 0, `getAvailability returns candidates (${availability.length} found)`);
+  check(availability.status === "open", `getAvailability reports the venue open on ${day} (status=${availability.status})`);
+  const candidateCount = availability.status === "open" ? availability.candidates.length : 0;
+  check(candidateCount > 0, `getAvailability returns candidates (${candidateCount} found)`);
 
   // 2. Create a real booking on the top candidate.
   const booking1 = await createBooking(venue, {
@@ -57,8 +58,6 @@ async function main() {
   // 3. Start it -- status flips to active, a session row is created.
   const sessions1 = await startSession(booking1.id);
   check(sessions1.length === 1, `startSession creates one session row (got ${sessions1.length})`);
-  const [afterStart] = await db.select().from(tenant).where(eq(tenant.id, venue.id)); // touch db, ignore
-  void afterStart;
 
   // 4. End it -- booking completes, lane releases immediately.
   const endedSession = await endSession(sessions1[0]!.id, { gamesCompleted: 2 });

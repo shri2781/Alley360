@@ -14,8 +14,10 @@
 import { asc, eq } from "drizzle-orm";
 import { db, sql } from "../src/db/client.js";
 import { tstzrangeLiteral } from "../src/db/range.js";
-import { booking, lane, laneAllocation, tenant } from "../src/db/schema.js";
-import { addMinutes, businessDate, rolloverHour as deriveRolloverHour } from "../src/domain/time.js";
+import { booking, lane, laneAllocation } from "../src/db/schema.js";
+import { businessDateFor, type WeeklyHours } from "../src/domain/hours.js";
+import { addMinutes } from "../src/domain/time.js";
+import { getVenue } from "../src/server/venue.js";
 
 const PG_EXCLUSION_VIOLATION = "23P01";
 
@@ -27,7 +29,7 @@ async function allocate(opts: {
   playMin: number;
   label: string;
   timezone: string;
-  rolloverHour: number;
+  weeklyHours: WeeklyHours;
 }) {
   // occupies == play_window: there is no turnover component any more.
   const playEnd = addMinutes(opts.start, opts.playMin);
@@ -40,7 +42,7 @@ async function allocate(opts: {
         tenantId: opts.tenantId,
         partySize: 4,
         games: 2,
-        businessDate: businessDate(opts.start, opts.timezone, opts.rolloverHour),
+        businessDate: businessDateFor(opts.start, opts.timezone, opts.weeklyHours),
         scheduledStart: opts.start,
         estimatedPlayMin: opts.playMin,
         estimatedOccupyMin: opts.playMin,
@@ -74,8 +76,7 @@ function isExclusionViolation(err: unknown): boolean {
 }
 
 async function main() {
-  const [venue] = await db.select().from(tenant).limit(1);
-  if (!venue) throw new Error("no tenant — run `npm run db:reset` first");
+  const venue = await getVenue();
 
   const lanes = await db
     .select()
@@ -87,7 +88,7 @@ async function main() {
   const laneTwo = lanes[1];
   if (!laneOne || !laneTwo) throw new Error("expected at least 2 lanes");
 
-  const ctx = { tenantId: venue.id, timezone: venue.timezone, rolloverHour: deriveRolloverHour(venue.closesAtHour) };
+  const ctx = { tenantId: venue.id, timezone: venue.timezone, weeklyHours: venue.weeklyHours };
 
   // 18:00 UTC on a fixed future date, so the run is deterministic.
   const start = new Date("2026-09-12T18:00:00.000Z");

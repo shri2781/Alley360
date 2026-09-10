@@ -76,17 +76,138 @@
   color: var(--text-muted);
 }
 
-.packageRow {
-  display: grid;
-  grid-template-columns: 1.5fr 90px 110px 90px 80px;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
+.hoursTable {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.packageRow:last-of-type {
-  border-bottom: none;
+.hoursDayRow {
+  display: grid;
+  grid-template-columns: 90px 1fr 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.hoursDayLabel {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hoursClosedLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.hoursActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.rateBaseRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.rateList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rateRow {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.rateRowTop {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.rateRowTop .input {
+  flex: 1 1 160px;
+}
+
+.rateDays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rateDayToggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.rateWindow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.rateRowActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.weekPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.weekPreviewDay {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.weekPreviewLabel {
+  min-width: 40px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.weekPreviewSegments {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.weekPreviewSegment {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.weekPreviewClosed {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .input {
@@ -113,14 +234,6 @@
   background: var(--bg);
   color: var(--text);
   cursor: pointer;
-}
-
-.addRow {
-  display: grid;
-  grid-template-columns: 1.5fr 90px 110px 90px;
-  gap: 10px;
-  align-items: center;
-  padding-top: 14px;
 }
 
 .laneGrid {

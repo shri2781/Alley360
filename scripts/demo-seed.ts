@@ -11,23 +11,21 @@
  */
 import { eq } from "drizzle-orm";
 import { db, sql } from "../src/db/client.js";
-import { lane, laneAllocation, tenant } from "../src/db/schema.js";
+import { lane, laneAllocation } from "../src/db/schema.js";
 import { addMinutes } from "../src/domain/time.js";
 import { blockLane, createBooking } from "../src/server/services/booking.js";
 import { startSession } from "../src/server/services/session.js";
-import type { Venue } from "../src/server/services/availability.js";
+import { getVenue } from "../src/server/venue.js";
 
 async function main() {
-  const [venueRow] = await db.select().from(tenant).limit(1);
-  if (!venueRow) throw new Error("no tenant -- run `npm run db:reset` first");
-  const venue: Venue = venueRow;
+  const venue = await getVenue();
 
   const lanes = await db.select().from(lane).where(eq(lane.tenantId, venue.id));
   if (lanes.length < 4) throw new Error("expected at least 4 seeded lanes");
 
   const now = new Date();
 
-  console.log(`Seeding a realistic board for "${venueRow.name}" around ${now.toISOString()}\n`);
+  console.log(`Seeding a realistic board for "${venue.name}" around ${now.toISOString()}\n`);
 
   // Currently playing: started 20 min ago, on whichever lane the scheduler picks first.
   const playing = await createBooking(venue, {

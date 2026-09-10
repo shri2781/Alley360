@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, businessDate, rolloverHour, zonedInstant } from "./time";
+import { addDays, daysBetween, zonedDateString, zonedInstant, zonedInstantAtMinute } from "./time";
 
 describe("zonedInstant", () => {
   it("handles a half-hour-offset zone (India, UTC+5:30)", () => {
@@ -17,11 +17,6 @@ describe("zonedInstant", () => {
   it("handles UTC itself", () => {
     const instant = zonedInstant("2026-09-12", 22, "UTC");
     expect(instant.toISOString()).toBe("2026-09-12T22:00:00.000Z");
-  });
-
-  it("round-trips through businessDate for a mid-day hour", () => {
-    const instant = zonedInstant("2026-09-12", 14, "Asia/Kolkata");
-    expect(businessDate(instant, "Asia/Kolkata", 4)).toBe("2026-09-12");
   });
 
   it("defaults minute to 0 when omitted", () => {
@@ -44,32 +39,6 @@ describe("zonedInstant", () => {
   });
 });
 
-describe("rolloverHour", () => {
-  it("is 0 for a venue that closes by midnight", () => {
-    expect(rolloverHour(22)).toBe(0);
-    expect(rolloverHour(24)).toBe(0);
-  });
-
-  it("is the wall-clock closing hour for a venue that closes past midnight", () => {
-    expect(rolloverHour(28)).toBe(4);
-  });
-});
-
-describe("businessDate", () => {
-  it("counts a post-midnight, pre-rollover session toward the previous day", () => {
-    // 00:30 and 03:59 Kolkata on the 13th both belong to the 12th when rollover is 4am.
-    const halfPastMidnight = zonedInstant("2026-09-13", 0, "Asia/Kolkata", 30);
-    const justBeforeRollover = zonedInstant("2026-09-13", 3, "Asia/Kolkata", 59);
-    expect(businessDate(halfPastMidnight, "Asia/Kolkata", 4)).toBe("2026-09-12");
-    expect(businessDate(justBeforeRollover, "Asia/Kolkata", 4)).toBe("2026-09-12");
-  });
-
-  it("counts a session at or after rollover toward the current day", () => {
-    const atRollover = zonedInstant("2026-09-13", 4, "Asia/Kolkata", 30);
-    expect(businessDate(atRollover, "Asia/Kolkata", 4)).toBe("2026-09-13");
-  });
-});
-
 describe("addDays", () => {
   it("adds whole days within a month", () => {
     expect(addDays("2026-09-10", 6)).toBe("2026-09-16");
@@ -85,5 +54,51 @@ describe("addDays", () => {
 
   it("supports subtracting days via a negative count", () => {
     expect(addDays("2026-09-10", -1)).toBe("2026-09-09");
+  });
+});
+
+describe("daysBetween", () => {
+  it("is the sibling of addDays -- addDays(a, daysBetween(a, b)) === b", () => {
+    expect(daysBetween("2026-09-10", "2026-09-16")).toBe(6);
+    expect(addDays("2026-09-10", daysBetween("2026-09-10", "2026-09-16"))).toBe("2026-09-16");
+  });
+
+  it("is negative when the second date comes first", () => {
+    expect(daysBetween("2026-09-16", "2026-09-10")).toBe(-6);
+  });
+
+  it("is zero for the same date", () => {
+    expect(daysBetween("2026-09-10", "2026-09-10")).toBe(0);
+  });
+
+  it("crosses a month boundary", () => {
+    expect(daysBetween("2026-09-28", "2026-10-04")).toBe(6);
+  });
+});
+
+describe("zonedDateString", () => {
+  it("returns the venue-local calendar date, with no rollover applied", () => {
+    // 04:30 UTC is 10:00 AM in Kolkata (UTC+5:30) the same day.
+    expect(zonedDateString(new Date("2026-09-12T04:30:00.000Z"), "Asia/Kolkata")).toBe("2026-09-12");
+  });
+
+  it("crosses a calendar day even well before any business-hours rollover", () => {
+    // 19:00 UTC on the 12th is 00:30 AM in Kolkata on the 13th -- a plain calendar
+    // date, distinct from whatever business date that instant might roll onto.
+    expect(zonedDateString(new Date("2026-09-12T19:00:00.000Z"), "Asia/Kolkata")).toBe("2026-09-13");
+  });
+});
+
+describe("zonedInstantAtMinute", () => {
+  it("agrees with zonedInstant(date, 0, tz, min)", () => {
+    expect(zonedInstantAtMinute("2026-09-12", 630, "Asia/Kolkata")).toEqual(
+      zonedInstant("2026-09-12", 0, "Asia/Kolkata", 630),
+    );
+  });
+
+  it("normalizes minutes past 1439 into the next calendar day, like zonedInstant does for hours past 23", () => {
+    // 1560 minutes = 2:00 AM the next day.
+    const instant = zonedInstantAtMinute("2026-09-12", 1560, "Asia/Kolkata");
+    expect(instant.toISOString()).toBe("2026-09-12T20:30:00.000Z");
   });
 });

@@ -3,7 +3,7 @@
  * for demos is a separate `demo:seed` script in M7.
  */
 import { db, sql } from "./client";
-import { lane, pkg, staffUser, tenant } from "./schema";
+import { lane, rate, staffUser, tenant, venueHours } from "./schema";
 import { hashPassword } from "../server/auth/password";
 
 /** Placeholder venue settings. Set VENUE_TIMEZONE, or change these for the real alley. */
@@ -24,12 +24,22 @@ export async function seed() {
     .values({
       name: VENUE_NAME,
       timezone: VENUE_TIMEZONE,
-      opensAtHour: OPENS_AT_HOUR,
-      closesAtHour: CLOSES_AT_HOUR,
     })
     .returning();
 
   if (!venue) throw new Error("failed to insert tenant");
+
+  // Same hours every day of the week, expressed at the new minutes-since-midnight
+  // resolution -- the per-day model exists so an owner CAN differ Friday from
+  // Monday in Settings, not so the seed has to guess a realistic default for them.
+  await db.insert(venueHours).values(
+    Array.from({ length: 7 }, (_, dayOfWeek) => ({
+      tenantId: venue.id,
+      dayOfWeek,
+      opensAtMin: OPENS_AT_HOUR * 60,
+      closesAtMin: CLOSES_AT_HOUR * 60,
+    })),
+  );
 
   await db.insert(lane).values(
     Array.from({ length: LANE_COUNT }, (_, i) => ({
@@ -39,12 +49,30 @@ export async function seed() {
     })),
   );
 
-  // Display-only pricing tiers -- "pay at venue," not wired to any payment logic.
-  // Games count feeds the booking form; price is shown as an estimate only.
-  await db.insert(pkg).values([
-    { tenantId: venue.id, name: "Basic Bowl", games: 1, pricePerPerson: 299, sortOrder: 1 },
-    { tenantId: venue.id, name: "Strike Special", games: 2, pricePerPerson: 499, sortOrder: 2 },
-    { tenantId: venue.id, name: "Ultimate Fun", games: 3, pricePerPerson: 699, sortOrder: 3 },
+  // Base + ordered overrides: Regular always applies unless a special matches first.
+  // Days are 0=Sun..6=Sat. These two specials happen not to overlap in days, so the
+  // seed alone won't demonstrate first-match-wins -- that becomes visible as soon as
+  // an overlapping rate is added by hand (e.g. a Friday-evening special).
+  await db.insert(rate).values([
+    { tenantId: venue.id, name: "Regular", pricePerPerson: 299, isBase: true },
+    {
+      tenantId: venue.id,
+      name: "Happy Hours",
+      pricePerPerson: 199,
+      days: [1, 2, 3, 4, 5], // Mon-Fri
+      startsAtMin: 720, // 12:00 PM
+      endsAtMin: 960, // 4:00 PM
+      priority: 1,
+    },
+    {
+      tenantId: venue.id,
+      name: "Weekend",
+      pricePerPerson: 349,
+      days: [0, 6], // Sun, Sat
+      startsAtMin: null, // all day
+      endsAtMin: null,
+      priority: 2,
+    },
   ]);
 
   await db.insert(staffUser).values({
@@ -59,7 +87,10 @@ export async function seed() {
     );
   }
 
-  console.log(`seeded "${venue.name}" (${VENUE_TIMEZONE}) with ${LANE_COUNT} lanes, 3 packages, and 1 staff login`);
+  console.log(
+    `seeded "${venue.name}" (${VENUE_TIMEZONE}) with ${LANE_COUNT} lanes, 7 days of hours, ` +
+      "3 rates, and 1 staff login",
+  );
   return venue;
 }
 

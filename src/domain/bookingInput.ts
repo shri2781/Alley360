@@ -6,6 +6,7 @@
 import { addDays } from "./time";
 
 export const MAX_BOOKING_PLAYERS = 24;
+export const MAX_BOOKING_GAMES = 10;
 export const MAX_CUSTOMER_NAME_LENGTH = 80;
 
 // Customers can only book within a rolling week: today through six days out. E.g. on
@@ -21,7 +22,9 @@ export function validateBookingRequest(players: number, games: number): string |
   if (!Number.isInteger(players) || players < 1 || players > MAX_BOOKING_PLAYERS) {
     return `Enter a whole number of players between 1 and ${MAX_BOOKING_PLAYERS}.`;
   }
-  if (!Number.isInteger(games) || games < 1) return "Choose at least one game.";
+  if (!Number.isInteger(games) || games < 1 || games > MAX_BOOKING_GAMES) {
+    return `Choose between 1 and ${MAX_BOOKING_GAMES} games.`;
+  }
   return null;
 }
 

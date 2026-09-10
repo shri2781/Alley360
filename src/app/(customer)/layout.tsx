@@ -19,7 +19,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
       </a>
       <SiteHeader venueName={venue.name} />
       <main id="main">{children}</main>
-      <SiteFooter venueName={venue.name} opensAtHour={venue.opensAtHour} closesAtHour={venue.closesAtHour} />
+      <SiteFooter venueName={venue.name} weeklyHours={venue.weeklyHours} />
     </div>
   );
 }

@@ -72,7 +72,7 @@ describe("empty schedule", () => {
   });
 
   it("supports a close time on the following calendar day", () => {
-    // Alley opens 10:00 and closes 4:00 the next morning (closes_at_hour = 28) --
+    // Alley opens 10:00 and closes 4:00 the next morning (closes_at_min = 1440+240) --
     // the scheduler only ever sees openAt/closeAt as plain Dates, so a request in the
     // small hours must be offered exactly like any other time inside the window.
     const snap = snapshot([], t("10:00"), tNext("04:00"));

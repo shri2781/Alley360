@@ -8,6 +8,7 @@ import { db } from "../../db/client";
 import { parseTstzrange } from "../../db/range";
 import { lane, laneAllocation } from "../../db/schema";
 import { DEFAULT_ESTIMATOR_CONFIG, type EstimatorConfig } from "../../domain/config";
+import { businessDateFor, hoursForDate, venueWindow } from "../../domain/hours";
 import {
   findCandidates,
   type Allocation,
@@ -15,15 +16,9 @@ import {
   type Lane as SchedulerLane,
   type ScheduleSnapshot,
 } from "../../domain/scheduler";
-import { businessDate, rolloverHour, zonedInstant } from "../../domain/time";
+import type { Venue } from "../venue";
 
-/** The subset of a `tenant` row the scheduling code actually needs. */
-export type Venue = {
-  id: string;
-  timezone: string;
-  opensAtHour: number;
-  closesAtHour: number;
-};
+export type { Venue } from "../venue";
 
 export type AvailabilityRequest = {
   players: number;
@@ -33,14 +28,19 @@ export type AvailabilityRequest = {
 
 /**
  * Pulls this business date's lanes and live allocations out of Postgres and assembles
- * them into the plain-object shape the pure scheduler expects.
+ * them into the plain-object shape the pure scheduler expects. Returns null on a day
+ * the venue is closed -- callers must handle that rather than being handed an empty
+ * or nonsensical window.
  *
  * Deliberately fetches every confirmed/active allocation for the tenant, not just ones
  * on `businessDateStr` -- at this scale (a handful of bookings a day) that's simpler
  * than a date-range query, and correct regardless: an allocation from a different day
  * will never overlap a candidate window on this one, so it's harmless, just unfiltered.
  */
-export async function loadSnapshot(venue: Venue, businessDateStr: string): Promise<ScheduleSnapshot> {
+export async function loadSnapshot(venue: Venue, businessDateStr: string): Promise<ScheduleSnapshot | null> {
+  const window = venueWindow(businessDateStr, venue.timezone, venue.weeklyHours);
+  if (!window) return null;
+
   const lanes = await db
     .select()
     .from(lane)
@@ -57,22 +57,29 @@ export async function loadSnapshot(venue: Venue, businessDateStr: string): Promi
     return { laneId: a.laneId, start, end };
   });
 
-  return {
-    lanes: schedulerLanes,
-    allocations,
-    openAt: zonedInstant(businessDateStr, venue.opensAtHour, venue.timezone),
-    closeAt: zonedInstant(businessDateStr, venue.closesAtHour, venue.timezone),
-  };
+  return { lanes: schedulerLanes, allocations, openAt: window.openAt, closeAt: window.closeAt };
 }
+
+export type AvailabilityResult =
+  | { status: "closed"; businessDate: string }
+  | { status: "open"; businessDate: string; candidates: Candidate[] };
 
 /** The read-only half of booking: what times could this request actually have? */
 export async function getAvailability(
   venue: Venue,
   request: AvailabilityRequest,
   estimatorCfg: EstimatorConfig = DEFAULT_ESTIMATOR_CONFIG,
-): Promise<Candidate[]> {
-  const bDate = businessDate(request.preferredStart, venue.timezone, rolloverHour(venue.closesAtHour));
+): Promise<AvailabilityResult> {
+  const bDate = businessDateFor(request.preferredStart, venue.timezone, venue.weeklyHours);
   const snapshot = await loadSnapshot(venue, bDate);
+  if (!snapshot) return { status: "closed", businessDate: bDate };
+
   // Never offer a start that's already passed -- the scheduler itself is blind to the clock.
-  return findCandidates(snapshot, request, estimatorCfg, new Date());
+  const candidates = findCandidates(snapshot, request, estimatorCfg, new Date());
+  return { status: "open", businessDate: bDate, candidates };
 }
+
+/** hoursForDate re-exported for callers that already have a business date and just
+ *  need that day's own open/close minutes (e.g. to price a rate whose window is
+ *  null-bounded). */
+export { hoursForDate };

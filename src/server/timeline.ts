@@ -9,8 +9,10 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../db/client";
 import { parseTstzrange } from "../db/range";
 import { booking, lane, laneAllocation, tenant } from "../db/schema";
-import { businessDate, rolloverHour, zonedInstant, zonedParts } from "../domain/time";
+import { businessDateFor, venueWindow } from "../domain/hours";
+import { zonedInstantAtMinute, zonedParts } from "../domain/time";
 import { displayName } from "./labels";
+import { loadWeeklyHours } from "./venue";
 
 export type TimelineBlock = {
   /** The lane_allocation row -- the drag identity. Not bookingId: one booking can hold
@@ -43,6 +45,11 @@ export type TimelineData = {
   now: Date;
   windowStart: Date;
   windowEnd: Date;
+  /** True when today's business day is marked closed in Alley Timings. The window
+   *  still falls back to the full local calendar day (not an empty board) so any
+   *  live allocation -- a booking made before the day was closed, or a staff block --
+   *  stays visible rather than silently disappearing. */
+  isClosedToday: boolean;
   lanes: { id: string; number: number; displayName: string }[];
   blocks: TimelineBlock[];
   stats: {
@@ -57,20 +64,32 @@ export async function getTimeline(venueId: string): Promise<TimelineData> {
   const [venueRow] = await db.select().from(tenant).where(eq(tenant.id, venueId));
   if (!venueRow) throw new Error(`venue ${venueId} not found`);
 
+  const weeklyHours = await loadWeeklyHours(venueId);
+
   const now = new Date();
   const nowParts = zonedParts(now, venueRow.timezone);
   const dateStr = `${nowParts.year}-${pad(nowParts.month)}-${pad(nowParts.day)}`;
   // Distinct from dateStr: after midnight but before rollover, the business day that's
-  // still open is yesterday's -- that's the one openAt/closeAt need to span.
-  const bDateStr = businessDate(now, venueRow.timezone, rolloverHour(venueRow.closesAtHour));
+  // still open is yesterday's -- that's the one the window needs to span.
+  const bDateStr = businessDateFor(now, venueRow.timezone, weeklyHours);
 
-  const openAt = zonedInstant(bDateStr, venueRow.opensAtHour, venueRow.timezone);
-  const closeAt = zonedInstant(bDateStr, venueRow.closesAtHour, venueRow.timezone);
+  const window = venueWindow(bDateStr, venueRow.timezone, weeklyHours);
+  const isClosedToday = window === null;
 
-  // Before opening or after closing: fall back to the full day rather than showing
-  // an empty or nonsensical window.
-  const windowStart = now < openAt || now >= closeAt ? openAt : zonedInstant(dateStr, nowParts.hour, venueRow.timezone);
-  const windowEnd = closeAt;
+  let windowStart: Date;
+  let windowEnd: Date;
+  if (window) {
+    // Before opening or after closing: fall back to the full day rather than showing
+    // an empty or nonsensical window.
+    windowStart =
+      now < window.openAt || now >= window.closeAt
+        ? window.openAt
+        : zonedInstantAtMinute(dateStr, nowParts.hour * 60, venueRow.timezone);
+    windowEnd = window.closeAt;
+  } else {
+    windowStart = zonedInstantAtMinute(dateStr, 0, venueRow.timezone);
+    windowEnd = zonedInstantAtMinute(dateStr, 1440, venueRow.timezone);
+  }
 
   const lanes = await db
     .select()
@@ -121,6 +140,7 @@ export async function getTimeline(venueId: string): Promise<TimelineData> {
     now,
     windowStart,
     windowEnd,
+    isClosedToday,
     lanes: lanes.map((l) => ({ id: l.id, number: l.number, displayName: l.displayName })),
     blocks,
     stats: {

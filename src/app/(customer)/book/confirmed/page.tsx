@@ -73,6 +73,12 @@ export default async function ConfirmedPage({
               <strong>{row.customerName}</strong>
             </div>
           )}
+          {row.totalPrice !== null && (
+            <div className={styles.detailRow}>
+              <span>Total ({row.rateName})</span>
+              <strong>&#8377;{row.totalPrice}</strong>
+            </div>
+          )}
         </div>
 
         <p className={styles.note}>We&apos;ll see you then. Arrive a few minutes early for shoes.</p>
