@@ -19,7 +19,6 @@ export type TimelineBlock = {
   bookingId: string;
   laneId: string;
   kind: "booked" | "walkin" | "maintenance";
-  status: "confirmed" | "active";
   label: string;
   partySize: number;
   games: number;
@@ -100,7 +99,6 @@ export async function getTimeline(venueId: string): Promise<TimelineData> {
       bookingId: r.booking.id,
       laneId: r.allocation.laneId,
       kind,
-      status: r.allocation.status === "active" ? "active" : "confirmed",
       label: kind === "maintenance" ? (r.booking.notes ?? "Maintenance") : displayName(r.booking.customerName, r.booking.source),
       partySize: r.booking.partySize,
       games: r.booking.games,

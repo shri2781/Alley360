@@ -223,14 +223,6 @@
   color: var(--accent-2);
 }
 
-.durationNote {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  padding-top: var(--sp-2);
-  border-top: 1px solid var(--border);
-}
-
 /* ---------- Times ---------- */
 
 .timeGrid {

@@ -3,8 +3,7 @@
  * near-identical rules) -- this is the one place a button's look is decided. */
 
 .btnPrimary,
-.btnGhost,
-.btnPill {
+.btnGhost {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -24,10 +23,6 @@
 }
 
 .btnPrimary,
-.btnPill {
-  border-radius: var(--r-pill);
-}
-
 .btnGhost {
   border-radius: var(--r-pill);
 }
@@ -63,20 +58,6 @@
 
 .btnGhost:hover {
   background: rgba(255, 255, 255, 0.12);
-  border-color: var(--accent-2);
-}
-
-.btnPill {
-  background: transparent;
-  color: var(--text-muted);
-  border: 1px solid var(--border);
-  min-height: 36px;
-  padding: 0 var(--sp-4);
-  font-size: 0.875rem;
-}
-
-.btnPill:hover {
-  color: var(--text);
   border-color: var(--accent-2);
 }
 

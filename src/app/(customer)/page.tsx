@@ -12,7 +12,6 @@ import heroPhoto from "../../assets/photos/hero-alley.jpg";
 import laneDarkPhoto from "../../assets/photos/lane-dark.jpg";
 import ballReturnPhoto from "../../assets/photos/ball-return.jpg";
 import shoesFloorPhoto from "../../assets/photos/shoes-floor.jpg";
-import friendsChattingPhoto from "../../assets/photos/friends-chatting.jpg";
 import shoesTyingPhoto from "../../assets/photos/shoes-tying.jpg";
 import manBallPhoto from "../../assets/photos/man-ball.jpg";
 import pinsDownLanePhoto from "../../assets/photos/pins-down-lane.jpg";
