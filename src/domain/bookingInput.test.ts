@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isWithinBookingWindow,
   MAX_CUSTOMER_NAME_LENGTH,
   parseBookingStart,
   parseCustomerSearchDate,
@@ -52,5 +53,27 @@ describe("[unit][validation] customer booking input", () => {
     }
     expect(parseBookingStart("not-a-date")).toBeNull();
     expect(parseBookingStart("2026-09-12T14:00:00.000Z")).not.toBeNull();
+  });
+
+  it("allows today and rejects any date before it", () => {
+    expect(isWithinBookingWindow("2026-09-10", "2026-09-10")).toBe(true);
+    expect(isWithinBookingWindow("2026-09-09", "2026-09-10")).toBe(false);
+  });
+
+  it("on a Monday, allows through this coming Sunday and no further", () => {
+    // 2026-09-07 is a Monday; 2026-09-13 is the Sunday that ends its week.
+    expect(isWithinBookingWindow("2026-09-13", "2026-09-07")).toBe(true);
+    expect(isWithinBookingWindow("2026-09-14", "2026-09-07")).toBe(false);
+  });
+
+  it("on a Tuesday, allows through next Monday and no further", () => {
+    // 2026-09-08 is a Tuesday; 2026-09-14 is the following Monday.
+    expect(isWithinBookingWindow("2026-09-14", "2026-09-08")).toBe(true);
+    expect(isWithinBookingWindow("2026-09-15", "2026-09-08")).toBe(false);
+  });
+
+  it("rolls the window across a month boundary", () => {
+    expect(isWithinBookingWindow("2026-10-04", "2026-09-28")).toBe(true);
+    expect(isWithinBookingWindow("2026-10-05", "2026-09-28")).toBe(false);
   });
 });

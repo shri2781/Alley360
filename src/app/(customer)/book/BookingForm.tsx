@@ -14,19 +14,22 @@ export type PackageOption = {
   pricePerPerson: number;
 };
 
-const todayStr = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-};
-
-export function BookingForm({ packages }: { packages: PackageOption[] }) {
+export function BookingForm({
+  packages,
+  minDate,
+  maxDate,
+}: {
+  packages: PackageOption[];
+  minDate: string;
+  maxDate: string;
+}) {
   const router = useRouter();
 
   const [players, setPlayers] = useState(4);
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(packages[0]?.id ?? null);
   const games = packages.find((p) => p.id === selectedPackageId)?.games ?? 1;
 
-  const [dateStr, setDateStr] = useState(todayStr());
+  const [dateStr, setDateStr] = useState(minDate);
   const [hourStr, setHourStr] = useState("19:00");
 
   const [times, setTimes] = useState<TimeOption[]>([]);
@@ -193,7 +196,8 @@ export function BookingForm({ packages }: { packages: PackageOption[] }) {
                 type="date"
                 className={styles.input}
                 value={dateStr}
-                min={todayStr()}
+                min={minDate}
+                max={maxDate}
                 onChange={(e) => {
                   setDateStr(e.target.value);
                   resetSearch();

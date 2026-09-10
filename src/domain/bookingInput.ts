@@ -3,8 +3,14 @@
  * constraints are useful feedback, but callers can bypass them, so these rules run
  * at the server boundary too.
  */
+import { addDays } from "./time";
+
 export const MAX_BOOKING_PLAYERS = 24;
 export const MAX_CUSTOMER_NAME_LENGTH = 80;
+
+// Customers can only book within a rolling week: today through six days out. E.g. on
+// a Monday that's this coming Sunday; on a Tuesday it's next Monday.
+export const BOOKING_WINDOW_DAYS = 7;
 
 // Supports ordinary international names while keeping emoji, markup, digits, and
 // control characters out of a value that is shown back to staff and customers.
@@ -51,4 +57,11 @@ export function parseCustomerSearchTime(hourStr: string): { hour: number; minute
   const hour = Number(match[1]);
   const minute = Number(match[2] ?? 0);
   return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59 ? { hour, minute } : null;
+}
+
+/** Whether `dateStr` falls within the rolling booking window that starts on
+ *  `todayStr` (both 'YYYY-MM-DD' business dates). Plain string comparison is valid
+ *  here because ISO date strings sort lexicographically in calendar order. */
+export function isWithinBookingWindow(dateStr: string, todayStr: string): boolean {
+  return dateStr >= todayStr && dateStr <= addDays(todayStr, BOOKING_WINDOW_DAYS - 1);
 }

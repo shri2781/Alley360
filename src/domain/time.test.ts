@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { businessDate, rolloverHour, zonedInstant } from "./time";
+import { addDays, businessDate, rolloverHour, zonedInstant } from "./time";
 
 describe("zonedInstant", () => {
   it("handles a half-hour-offset zone (India, UTC+5:30)", () => {
@@ -67,5 +67,23 @@ describe("businessDate", () => {
   it("counts a session at or after rollover toward the current day", () => {
     const atRollover = zonedInstant("2026-09-13", 4, "Asia/Kolkata", 30);
     expect(businessDate(atRollover, "Asia/Kolkata", 4)).toBe("2026-09-13");
+  });
+});
+
+describe("addDays", () => {
+  it("adds whole days within a month", () => {
+    expect(addDays("2026-09-10", 6)).toBe("2026-09-16");
+  });
+
+  it("rolls over a month boundary", () => {
+    expect(addDays("2026-09-28", 6)).toBe("2026-10-04");
+  });
+
+  it("rolls over a year boundary", () => {
+    expect(addDays("2026-12-29", 6)).toBe("2027-01-04");
+  });
+
+  it("supports subtracting days via a negative count", () => {
+    expect(addDays("2026-09-10", -1)).toBe("2026-09-09");
   });
 });

@@ -52,9 +52,20 @@ export function businessDate(instant: Date, timeZone: string, rolloverHour: numb
   let ms = Date.UTC(p.year, p.month - 1, p.day);
   if (p.hour < rolloverHour) ms -= MS_PER_DAY;
 
-  const d = new Date(ms);
+  return formatDateUTC(new Date(ms));
+}
+
+function formatDateUTC(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
+/** Adds (or, with a negative count, subtracts) whole days to a 'YYYY-MM-DD' business
+ *  date. Pure calendar arithmetic -- no timezone involved, since the input is already
+ *  a venue-local business date rather than an instant. */
+export function addDays(dateStr: string, days: number): string {
+  const [year, month, day] = dateStr.split("-").map(Number) as [number, number, number];
+  return formatDateUTC(new Date(Date.UTC(year, month - 1, day) + days * MS_PER_DAY));
 }
 
 /**

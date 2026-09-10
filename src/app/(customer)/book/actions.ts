@@ -3,8 +3,9 @@
 import { getAvailability } from "../../../server/services/availability";
 import { bookSpecificSlot, NoAvailabilityError } from "../../../server/services/booking";
 import { getVenue } from "../../../server/venue";
-import { zonedInstant } from "../../../domain/time";
+import { businessDate, rolloverHour, zonedInstant } from "../../../domain/time";
 import {
+  isWithinBookingWindow,
   parseBookingStart,
   parseCustomerSearchDate,
   parseCustomerSearchTime,
@@ -31,6 +32,9 @@ export async function findTimes(input: FindTimesInput): Promise<TimeOption[]> {
   if (!preferredTime) return [];
 
   const venue = await getVenue();
+  const today = businessDate(new Date(), venue.timezone, rolloverHour(venue.closesAtHour));
+  if (!isWithinBookingWindow(input.dateStr, today)) return [];
+
   const preferredStart = zonedInstant(input.dateStr, preferredTime.hour, venue.timezone, preferredTime.minute);
 
   const candidates = await getAvailability(venue, {
@@ -80,6 +84,11 @@ export async function confirmBooking(input: ConfirmBookingInput): Promise<Confir
   if (!start) return { ok: false, message: "Choose a valid booking time." };
 
   const venue = await getVenue();
+  const today = businessDate(new Date(), venue.timezone, rolloverHour(venue.closesAtHour));
+  const bookingDate = businessDate(start, venue.timezone, rolloverHour(venue.closesAtHour));
+  if (!isWithinBookingWindow(bookingDate, today)) {
+    return { ok: false, message: "That date is outside the booking window. Please search again." };
+  }
 
   try {
     const booking = await bookSpecificSlot(
