@@ -2,14 +2,17 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { eq } from "drizzle-orm";
+import { db } from "../../../db/client";
+import { booking } from "../../../db/schema";
 import {
   moveAllocation,
   moveFailureMessage,
   MoveRejectedError,
   type MoveAllocationInput,
 } from "../../../server/services/allocation";
-import { createBooking, NoAvailabilityError } from "../../../server/services/booking";
-import { startSession } from "../../../server/services/session";
+import { cancelBooking, createBooking, NoAvailabilityError } from "../../../server/services/booking";
+import { endBooking, startSession } from "../../../server/services/session";
 import { getVenue } from "../../../server/venue";
 import { getStaffUser, requireStaff } from "../../../server/auth/dal";
 import { validateCustomerName } from "../../../domain/bookingInput";
@@ -39,14 +42,15 @@ export async function addWalkIn(formData: FormData) {
   const venue = await getVenue();
 
   try {
-    const booking = await createBooking(venue, {
+    // `created`, not `booking`: that name is the schema table in this module now.
+    const created = await createBooking(venue, {
       players,
       games,
       preferredStart: new Date(),
       source: "walkin",
       customerName,
     });
-    await startSession(booking.id);
+    await startSession(created.id);
   } catch (err) {
     if (err instanceof NoAvailabilityError) {
       redirect("/staff?error=" + encodeURIComponent("No lane is free right now for that group."));
@@ -54,7 +58,6 @@ export async function addWalkIn(formData: FormData) {
     throw err;
   }
 
-  revalidatePath("/staff/bookings");
   revalidatePath("/staff");
   redirect("/staff");
 }
@@ -87,6 +90,57 @@ export async function moveAllocationAction(
   }
 
   revalidatePath("/staff");
-  revalidatePath("/staff/bookings");
   return { ok: true };
+}
+
+export type BlockActionResult = { ok: true } | { ok: false; message: string };
+
+type BookingStatus = "confirmed" | "active" | "completed" | "cancelled" | "no_show";
+
+/**
+ * Start / End / Cancel driven from the timeline's block popover.
+ *
+ * Returns a result for the same reason moveAllocationAction does: the caller is a button
+ * inside a client component with its own error slot, not a <form> with an error boundary
+ * above it, so a redirect's throw would have nowhere to land.
+ *
+ * The status re-read is what makes that possible. The board polls every 10 seconds, so a
+ * popover can be clicked against a booking that has since moved on -- without the check,
+ * startSession/endBooking would throw a bare Error and blow up the page for what is a
+ * routine stale-view click. Checking here (rather than catching) keeps a real bug loud:
+ * anything the services throw after the precondition held still propagates.
+ */
+async function runBlockAction(
+  bookingId: string,
+  allowed: BookingStatus[],
+  work: () => Promise<unknown>,
+): Promise<BlockActionResult> {
+  if (!(await getStaffUser())) {
+    return { ok: false, message: "Session expired. Please sign in again." };
+  }
+
+  const [row] = await db.select({ status: booking.status }).from(booking).where(eq(booking.id, bookingId));
+  if (!row) return { ok: false, message: "That booking no longer exists." };
+  if (!allowed.includes(row.status)) {
+    return { ok: false, message: `That booking is ${row.status.replace("_", " ")} now -- the board is out of date.` };
+  }
+
+  await work();
+
+  revalidatePath("/staff");
+  return { ok: true };
+}
+
+// `async`, not a plain function returning the promise: every export of a "use server"
+// file is compiled into a server action, and Next only accepts async functions there.
+export async function startBookingAction(bookingId: string): Promise<BlockActionResult> {
+  return runBlockAction(bookingId, ["confirmed"], () => startSession(bookingId));
+}
+
+export async function endBookingAction(bookingId: string): Promise<BlockActionResult> {
+  return runBlockAction(bookingId, ["active"], () => endBooking(bookingId));
+}
+
+export async function cancelBookingAction(bookingId: string): Promise<BlockActionResult> {
+  return runBlockAction(bookingId, ["confirmed"], () => cancelBooking(bookingId));
 }

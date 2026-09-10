@@ -6,7 +6,12 @@ import { DEFAULT_ESTIMATOR_CONFIG } from "../../../domain/config";
 import { roundToGrid } from "../../../domain/scheduler";
 import { addMinutes } from "../../../domain/time";
 import type { TimelineBlock, TimelineData } from "../../../server/timeline";
-import { moveAllocationAction } from "./actions";
+import {
+  cancelBookingAction,
+  endBookingAction,
+  moveAllocationAction,
+  startBookingAction,
+} from "./actions";
 import styles from "./timeline.module.css";
 
 const GRID_MIN = DEFAULT_ESTIMATOR_CONFIG.slotGridMin;
@@ -16,6 +21,10 @@ const DRAG_THRESHOLD_PX = 4;
 const OVERRIDE_TIMEOUT_MS = 8_000;
 /** Width of the lane-label gutter -- must match .laneLabel in timeline.module.css. */
 const GUTTER_PX = 88;
+/** Popover box, needed here to keep it on screen -- must match .popover in the CSS. */
+const POPOVER_W = 260;
+const POPOVER_MAX_H = 300;
+const VIEWPORT_MARGIN = 8;
 
 type Placement = { laneId: string; start: Date; end: Date };
 
@@ -49,8 +58,18 @@ type PointerSession = {
   dragging: boolean;
   trackEl: HTMLElement;
   tracksEl: HTMLElement;
+  /** The block itself even when the press landed on a resize handle -- a press that
+   *  never became a drag opens the details popover, anchored to this. */
+  blockEl: HTMLElement;
   releasePause: (() => void) | null;
 };
+
+/** Which block's details are open, and where to draw the card. Coordinates are
+ *  VIEWPORT coordinates: the card is position:fixed so it escapes .timelineWrap's
+ *  horizontal scroll clipping, which would otherwise cut it off. */
+type PopoverState = { allocationId: string; x: number; y: number };
+
+type ActionKind = "start" | "end" | "cancel";
 
 function formatTime(date: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit" }).format(date);
@@ -79,6 +98,20 @@ const BLOCK_CLASS = {
   maintenance: styles.blockMaintenance,
 };
 
+const STATUS_CLASS: Record<TimelineBlock["status"], string | undefined> = {
+  confirmed: styles.popBadgeConfirmed,
+  active: styles.popBadgeActive,
+  completed: styles.popBadgeCompleted,
+  cancelled: styles.popBadgeCancelled,
+  no_show: styles.popBadgeCancelled,
+};
+
+const KIND_LABEL: Record<TimelineBlock["kind"], string> = {
+  booked: "Booking",
+  walkin: "Walk-in",
+  maintenance: "Lane block",
+};
+
 export function TimelineChart({ data }: { data: TimelineData }) {
   const { windowStart, windowEnd, now, timezone, lanes } = data;
   const totalMs = windowEnd.getTime() - windowStart.getTime();
@@ -87,6 +120,12 @@ export function TimelineChart({ data }: { data: TimelineData }) {
   const [overrides, setOverrides] = useState<Map<string, Placement>>(new Map());
   const [drag, setDrag] = useState<DragState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [popover, setPopover] = useState<PopoverState | null>(null);
+  const [pendingAction, setPendingAction] = useState<ActionKind | null>(null);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  /** Separate from `error`: a rejected Start/Cancel belongs in the card the operator is
+   *  looking at, not in a banner above a timeline the backdrop is covering. */
+  const [actionError, setActionError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const pointerRef = useRef<PointerSession | null>(null);
@@ -141,6 +180,86 @@ export function TimelineChart({ data }: { data: TimelineData }) {
     const id = setTimeout(() => setOverrides(new Map()), OVERRIDE_TIMEOUT_MS);
     return () => clearTimeout(id);
   }, [overrides]);
+
+  /** The open block, re-read from the CURRENT blocks every render rather than captured
+   *  when the popover opened -- so Start flips the card's own status badge and buttons. */
+  const selected = popover ? (blocks.find((b) => b.allocationId === popover.allocationId) ?? null) : null;
+
+  /** Cancel releases the allocation, so the block leaves the board -- close with it. */
+  useEffect(() => {
+    if (popover && !selected) setPopover(null);
+  }, [popover, selected]);
+
+  useEffect(() => {
+    setConfirmingCancel(false);
+    setActionError(null);
+  }, [popover]);
+
+  /** Hold the 10-second poll while the card is open: a re-render underneath it would
+   *  swap the block out mid-read, and the operator is about to act on what they see. */
+  useEffect(() => {
+    if (!popover) return;
+    return acquireRefreshPause();
+  }, [popover]);
+
+  /** Fixed coordinates go stale the moment anything scrolls or the layout reflows;
+   *  closing beats leaving a card pointing at empty space. */
+  useEffect(() => {
+    if (!popover) return;
+    const close = () => setPopover(null);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [popover]);
+
+  const openPopover = useCallback((allocationId: string, anchor: HTMLElement) => {
+    const r = anchor.getBoundingClientRect();
+
+    // Prefer directly under the block; flip above when the bottom of the window is
+    // close. POPOVER_MAX_H is an upper bound, not the measured height, so the flip can
+    // trigger a little early -- it never leaves the card off-screen, which is the point.
+    const below = r.bottom + 6;
+    const fitsBelow = below + POPOVER_MAX_H <= window.innerHeight - VIEWPORT_MARGIN;
+    const y = fitsBelow ? below : Math.max(VIEWPORT_MARGIN, r.top - 6 - POPOVER_MAX_H);
+
+    const x = Math.min(
+      Math.max(r.left, VIEWPORT_MARGIN),
+      Math.max(VIEWPORT_MARGIN, window.innerWidth - POPOVER_W - VIEWPORT_MARGIN),
+    );
+
+    setError(null);
+    setPopover({ allocationId, x, y });
+  }, []);
+
+  const runBookingAction = useCallback(
+    (kind: ActionKind, bookingId: string) => {
+      const action =
+        kind === "start" ? startBookingAction : kind === "end" ? endBookingAction : cancelBookingAction;
+
+      setPendingAction(kind);
+      setActionError(null);
+
+      startTransition(async () => {
+        try {
+          const res = await action(bookingId);
+          if (res.ok) setPopover(null);
+          else setActionError(res.message);
+        } finally {
+          setPendingAction(null);
+          setConfirmingCancel(false);
+        }
+      });
+    },
+    [],
+  );
 
   const laneAtY = useCallback(
     (clientY: number, fallback: string): string => {
@@ -197,7 +316,10 @@ export function TimelineChart({ data }: { data: TimelineData }) {
 
       const trackEl = (e.currentTarget.closest(`.${styles.track}`) ?? null) as HTMLElement | null;
       const tracksEl = tracksRef.current;
-      if (!trackEl || !tracksEl) return;
+      // closest() matches the element itself, so this is the block for a "move" press
+      // and the block behind the handle for a resize press.
+      const blockEl = (e.currentTarget.closest(`.${styles.block}`) ?? null) as HTMLElement | null;
+      if (!trackEl || !tracksEl || !blockEl) return;
 
       e.preventDefault();
       e.stopPropagation();
@@ -212,6 +334,7 @@ export function TimelineChart({ data }: { data: TimelineData }) {
         dragging: false,
         trackEl,
         tracksEl,
+        blockEl,
         releasePause: null,
       };
     },
@@ -230,6 +353,7 @@ export function TimelineChart({ data }: { data: TimelineData }) {
         session.dragging = true;
         session.releasePause = acquireRefreshPause();
         setError(null);
+        setPopover(null);
       }
 
       const placement = placementFor(session, e.clientX, e.clientY);
@@ -262,8 +386,12 @@ export function TimelineChart({ data }: { data: TimelineData }) {
       const wasDragging = session.dragging;
       setDrag(null);
 
+      // A press that never travelled far enough to be a drag is a click: show the
+      // booking's details and its Start/End/Cancel actions.
       if (!wasDragging) {
         session.releasePause?.();
+        if (popover?.allocationId === session.block.allocationId) setPopover(null);
+        else openPopover(session.block.allocationId, session.blockEl);
         return;
       }
 
@@ -307,7 +435,7 @@ export function TimelineChart({ data }: { data: TimelineData }) {
         }
       });
     },
-    [placementFor],
+    [placementFor, popover, openPopover],
   );
 
   const cancelPointer = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -338,7 +466,9 @@ export function TimelineChart({ data }: { data: TimelineData }) {
           <span className={styles.legendDot} style={{ background: "#e08a2b" }} />
           Maintenance
         </span>
-        <span className={styles.legendHint}>Drag a block to move it &middot; drag either edge to resize</span>
+        <span className={styles.legendHint}>
+          Click a block for details &middot; drag to move it &middot; drag either edge to resize
+        </span>
       </div>
 
       {error && (
@@ -456,6 +586,138 @@ export function TimelineChart({ data }: { data: TimelineData }) {
       </div>
 
       {blocks.length === 0 && <p className={styles.emptyNote}>Nothing on the schedule for this window.</p>}
+
+      {popover && selected && (
+        <>
+          <div className={styles.popBackdrop} onPointerDown={() => setPopover(null)} />
+          <div
+            className={styles.popover}
+            style={{ left: `${popover.x}px`, top: `${popover.y}px` }}
+            role="dialog"
+            aria-label={`${selected.label} details`}
+          >
+            <div className={styles.popHead}>
+              <div>
+                <div className={styles.popName}>{selected.label}</div>
+                <div className={styles.popKind}>
+                  {KIND_LABEL[selected.kind]} &middot;{" "}
+                  {/* Every lane the same booking holds, in lane order -- a party split
+                      across two lanes is one booking, and Start/End move both. */}
+                  {lanes
+                    .filter((l) => blocks.some((b) => b.bookingId === selected.bookingId && b.laneId === l.id))
+                    .map((l) => l.displayName)
+                    .join(", ")}
+                </div>
+              </div>
+              <span className={`${styles.popBadge} ${STATUS_CLASS[selected.status] ?? ""}`}>
+                {selected.status.replace("_", " ")}
+              </span>
+            </div>
+
+            <dl className={styles.popRows}>
+              <div className={styles.popRow}>
+                <dt>Time</dt>
+                <dd>
+                  {formatTime(selected.trueStart, timezone)} &ndash; {formatTime(selected.trueEnd, timezone)}
+                </dd>
+              </div>
+              {selected.kind !== "maintenance" && (
+                <>
+                  <div className={styles.popRow}>
+                    <dt>People</dt>
+                    <dd>
+                      {selected.partySize} &middot; {selected.games} {selected.games === 1 ? "game" : "games"}
+                    </dd>
+                  </div>
+                  <div className={styles.popRow}>
+                    <dt>Phone</dt>
+                    <dd>
+                      {selected.phone ? (
+                        <a className={styles.popPhone} href={`tel:${selected.phone}`}>
+                          {selected.phone}
+                        </a>
+                      ) : (
+                        <span className={styles.popMuted}>Not given</span>
+                      )}
+                    </dd>
+                  </div>
+                </>
+              )}
+            </dl>
+
+            {actionError && (
+              <p className={styles.popError} role="alert">
+                {actionError}
+              </p>
+            )}
+
+            <div className={styles.popActions}>
+              {selected.status === "confirmed" && selected.kind !== "maintenance" && (
+                <button
+                  type="button"
+                  className={`${styles.popBtn} ${styles.popBtnStart}`}
+                  disabled={pendingAction !== null}
+                  onClick={() => runBookingAction("start", selected.bookingId)}
+                >
+                  {pendingAction === "start" ? "Starting..." : "Start"}
+                </button>
+              )}
+
+              {selected.status === "active" && (
+                <button
+                  type="button"
+                  className={`${styles.popBtn} ${styles.popBtnEnd}`}
+                  disabled={pendingAction !== null}
+                  onClick={() => runBookingAction("end", selected.bookingId)}
+                >
+                  {pendingAction === "end" ? "Ending..." : "End"}
+                </button>
+              )}
+
+              {/* Cancel frees the lane and cannot be undone from this screen, and the
+                  card opens on a single click -- so it asks once before it fires. */}
+              {selected.status === "confirmed" &&
+                (confirmingCancel ? (
+                  <>
+                    <button
+                      type="button"
+                      className={`${styles.popBtn} ${styles.popBtnCancel}`}
+                      disabled={pendingAction !== null}
+                      onClick={() => runBookingAction("cancel", selected.bookingId)}
+                    >
+                      {pendingAction === "cancel" ? "Cancelling..." : "Confirm cancel"}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.popBtn}
+                      disabled={pendingAction !== null}
+                      onClick={() => setConfirmingCancel(false)}
+                    >
+                      Keep
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className={`${styles.popBtn} ${styles.popBtnCancel}`}
+                    disabled={pendingAction !== null}
+                    onClick={() => setConfirmingCancel(true)}
+                  >
+                    {selected.kind === "maintenance" ? "Remove block" : "Cancel"}
+                  </button>
+                ))}
+
+              <button
+                type="button"
+                className={`${styles.popBtn} ${styles.popBtnClose}`}
+                onClick={() => setPopover(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

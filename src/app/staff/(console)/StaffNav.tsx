@@ -7,7 +7,6 @@ import styles from "./staff-layout.module.css";
 
 const LINKS = [
   { href: "/staff", label: "Lane Allotment" },
-  { href: "/staff/bookings", label: "Bookings" },
   { href: "/staff/settings", label: "Settings" },
 ];
 
@@ -19,7 +18,7 @@ export function StaffNav() {
       <ul className={styles.nav}>
         {LINKS.map((link) => {
           // Exact match for "/staff" itself, prefix match for sub-routes -- otherwise
-          // "/staff" would stay highlighted while viewing "/staff/bookings" too.
+          // "/staff" would stay highlighted while viewing "/staff/settings" too.
           const active = link.href === "/staff" ? pathname === "/staff" : pathname.startsWith(link.href);
           return (
             <li key={link.href}>

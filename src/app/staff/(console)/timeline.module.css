@@ -281,3 +281,167 @@
   color: var(--text-muted);
   font-size: 14px;
 }
+
+/* Block details popover -------------------------------------------------------
+   Fixed, not absolute: .timelineWrap sets overflow-x, which makes its overflow-y
+   compute to auto as well, and an absolutely positioned card would be clipped by
+   it. Fixed escapes that -- no ancestor here sets transform/filter/contain, which
+   would otherwise re-establish a containing block. */
+
+.popBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.popover {
+  position: fixed;
+  z-index: 41;
+  width: 260px;
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  padding: 14px;
+  font-size: 13px;
+}
+
+.popHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.popName {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.popKind {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.popBadge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.popBadgeConfirmed {
+  background: var(--state-booked-soon-bg);
+  color: var(--state-booked-soon-text);
+}
+
+.popBadgeActive {
+  background: var(--state-playing-bg);
+  color: var(--state-playing-text);
+}
+
+.popBadgeCompleted {
+  background: var(--state-available-bg);
+  color: var(--state-available-text);
+}
+
+.popBadgeCancelled {
+  background: var(--state-maintenance-bg);
+  color: var(--state-maintenance-text);
+}
+
+.popRows {
+  margin: 0 0 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.popRow {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.popRow dt {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.popRow dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.popPhone {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px dotted var(--border);
+}
+
+.popMuted {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.popError {
+  margin: 0 0 10px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--state-overrun-text);
+  background: rgba(220, 60, 60, 0.12);
+  font-size: 12px;
+}
+
+.popActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.popBtn {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.popBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.popBtnStart {
+  border-color: var(--state-playing-text);
+  color: var(--state-playing-text);
+}
+
+.popBtnEnd {
+  border-color: var(--state-available-text);
+  color: var(--state-available-text);
+}
+
+.popBtnCancel {
+  border-color: var(--state-overrun-text);
+  color: var(--state-overrun-text);
+}
+
+.popBtnClose {
+  margin-left: auto;
+  color: var(--text-muted);
+}

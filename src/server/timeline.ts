@@ -19,7 +19,11 @@ export type TimelineBlock = {
   bookingId: string;
   laneId: string;
   kind: "booked" | "walkin" | "maintenance";
+  /** The booking's own status, not the allocation's -- Start/End/Cancel act on the whole
+   *  booking, so the details popover must show and gate on the booking-level state. */
+  status: "confirmed" | "active" | "completed" | "cancelled" | "no_show";
   label: string;
+  phone: string | null;
   partySize: number;
   games: number;
   /** Clamped to the visible window -- a session that started before the window
@@ -99,7 +103,9 @@ export async function getTimeline(venueId: string): Promise<TimelineData> {
       bookingId: r.booking.id,
       laneId: r.allocation.laneId,
       kind,
+      status: r.booking.status,
       label: kind === "maintenance" ? (r.booking.notes ?? "Maintenance") : displayName(r.booking.customerName, r.booking.source),
+      phone: r.booking.customerPhone,
       partySize: r.booking.partySize,
       games: r.booking.games,
       start: occ.start < windowStart ? windowStart : occ.start,

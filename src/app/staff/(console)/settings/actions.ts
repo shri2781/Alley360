@@ -14,7 +14,6 @@ function revalidateSettings() {
   revalidatePath("/"); // packages shown on the customer landing page
   revalidatePath("/book");
   revalidatePath("/staff"); // timeline window depends on venue hours
-  revalidatePath("/staff/bookings");
 }
 
 export async function updateVenueHours(formData: FormData) {
