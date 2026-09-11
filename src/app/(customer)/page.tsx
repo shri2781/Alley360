@@ -121,7 +121,6 @@ export default async function LandingPage() {
         <Reveal>
           <div className={styles.sectionHeading}>
             <h2 className={styles.sectionTitle}>Our Rates</h2>
-            <p className={styles.sectionSubtitle}>Simple per-game pricing &mdash; cheaper at Happy Hours, before you even ask</p>
           </div>
         </Reveal>
 
@@ -150,12 +149,6 @@ export default async function LandingPage() {
             </Reveal>
           ))}
         </div>
-
-        <Reveal>
-          <Link href="/book" className={`${btn.btnPrimary} ${btn.btnBlock}`}>
-            Book Now
-          </Link>
-        </Reveal>
       </section>
 
       <section id="how-it-works" className={styles.section}>
