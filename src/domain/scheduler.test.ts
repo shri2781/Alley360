@@ -154,6 +154,68 @@ describe("packing -- fewest dead minutes wins", () => {
   });
 });
 
+describe("prioritizeSoonest -- walk-ins can't be told to come back later", () => {
+  it("without it, a lane that frees up later but packs tighter beats one that's free right now", () => {
+    // A walk-in shows up at 15:00. Lane 1 is busy until 15:30 -- starting there then
+    // butts up perfectly against the existing booking (gap 0). Lane 2 is wide open right
+    // now, but that leaves large (capped) gaps on both sides. Default (packing-first)
+    // ranking sends the walk-in to lane 1 at 15:30 instead of lane 2 at 15:00 -- this is
+    // the bug: gapCost's cap makes the perfect-fit-but-30-minutes-later slot outscore the
+    // one that's free immediately.
+    const snap = snapshot([{ laneId: "L1", start: t("13:00"), end: t("15:30") }]);
+    const result = findCandidates(snap, { ...FOUR_BY_TWO, preferredStart: t("15:00") });
+    expect(result[0]!.start).toEqual(t("15:30"));
+    expect(numberOf(result[0]!.laneIds[0]!)).toBe(1);
+  });
+
+  it("with it, the lane that's free right now wins even though another lane packs tighter later", () => {
+    const snap = snapshot([{ laneId: "L1", start: t("13:00"), end: t("15:30") }]);
+    const result = findCandidates(snap, { ...FOUR_BY_TWO, preferredStart: t("15:00") }, undefined, undefined, {
+      prioritizeSoonest: true,
+    });
+    expect(result[0]!.start).toEqual(t("15:00"));
+    expect(numberOf(result[0]!.laneIds[0]!)).toBe(2);
+  });
+
+  it("with it, still falls forward to the next available lane/time when nothing is free right now", () => {
+    const snap = snapshot(LANES.map((l) => ({ laneId: l.id, start: t("15:00"), end: t("15:20") })));
+    const result = findCandidates(snap, { ...FOUR_BY_TWO, preferredStart: t("15:00") }, undefined, undefined, {
+      prioritizeSoonest: true,
+    });
+    expect(result.length).toBeGreaterThan(0);
+    expect(result[0]!.start).toEqual(t("15:20"));
+  });
+});
+
+describe("searchUntilClose -- a walk-in isn't turned away just because nothing frees up in 30 minutes", () => {
+  it("without it, a lane opening up beyond the 30-minute window is never offered", () => {
+    // Every lane is busy until 16:00 -- an hour past the 15:00 walk-in, well outside the
+    // default 30-minute window.
+    const snap = snapshot(LANES.map((l) => ({ laneId: l.id, start: t("13:00"), end: t("16:00") })));
+    const result = findCandidates(snap, { ...FOUR_BY_TWO, preferredStart: t("15:00") });
+    expect(result).toHaveLength(0);
+  });
+
+  it("with it, the same request is offered the moment a lane opens up later that day", () => {
+    const snap = snapshot(LANES.map((l) => ({ laneId: l.id, start: t("13:00"), end: t("16:00") })));
+    const result = findCandidates(snap, { ...FOUR_BY_TWO, preferredStart: t("15:00") }, undefined, undefined, {
+      prioritizeSoonest: true,
+      searchUntilClose: true,
+    });
+    expect(result.length).toBeGreaterThan(0);
+    expect(result[0]!.start).toEqual(t("16:00"));
+  });
+
+  it("with it, still reports no availability when every lane is booked through closing", () => {
+    const snap = snapshot(LANES.map((l) => ({ laneId: l.id, start: t("13:00"), end: t("22:00") })));
+    const result = findCandidates(snap, { ...FOUR_BY_TWO, preferredStart: t("15:00") }, undefined, undefined, {
+      prioritizeSoonest: true,
+      searchUntilClose: true,
+    });
+    expect(result).toHaveLength(0);
+  });
+});
+
 describe("now -- never offers or confirms a start that has already passed", () => {
   it("findCandidates excludes starts before now, even inside the window", () => {
     const result = findCandidates(

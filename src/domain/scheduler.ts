@@ -155,12 +155,29 @@ export function checkSlot(
   return { end, laneIds: [lane.id] };
 }
 
-/** How far either side of the requested time to look for a slot. */
+/** How far either side of the requested time to look for a slot, by default. */
 export const CANDIDATE_WINDOW_MIN = 30;
+
+export type FindCandidatesOptions = {
+  /** Flips the sort to closeness-first, packing-second. For a walk-in, preferredStart
+   *  IS now -- someone is standing at the counter, and gapCost's cap (shortestSellableMin
+   *  per side) means a lane that frees up later but butts up perfectly against the
+   *  existing booking can otherwise outscore a lane that's free immediately. That's the
+   *  right call for a scheduled booking (see "packing -- fewest dead minutes wins"
+   *  below), but not for someone who can't be told to come back in 20 minutes. */
+  prioritizeSoonest?: boolean;
+  /** Extends the forward edge of the search to closing time instead of stopping at
+   *  CANDIDATE_WINDOW_MIN. Also for walk-ins: "no lane free in the next 30 minutes"
+   *  isn't the same as "no lane free today," and a walk-in should be offered the 4pm
+   *  opening rather than turned away when nothing frees up sooner. The backward edge
+   *  (relevant only to a preferredStart in the past, which `now` already excludes)
+   *  is untouched. */
+  searchUntilClose?: boolean;
+};
 
 /**
  * The public entry point. Returns the feasible starts within CANDIDATE_WINDOW_MIN of the
- * requested time, tightest-packing first.
+ * requested time (or up to closing -- see `searchUntilClose`), tightest-packing first.
  *
  * Candidate starts are exactly the bookingGridMin boundaries in that window -- nothing
  * off-grid. That's sufficient for zero-gap packing (not just a best effort): every
@@ -173,13 +190,16 @@ export function findCandidates(
   request: BookingRequest,
   estimatorCfg: EstimatorConfig = DEFAULT_ESTIMATOR_CONFIG,
   now?: Date,
+  { prioritizeSoonest = false, searchUntilClose = false }: FindCandidatesOptions = {},
 ): Candidate[] {
   const estimate = estimateDuration(request.players, request.games, estimatorCfg);
   const shortestSellableMin = estimateDuration(1, 1, estimatorCfg).occupyMin;
   const grid = estimatorCfg.bookingGridMin;
 
   const windowStart = addMinutes(request.preferredStart, -CANDIDATE_WINDOW_MIN);
-  const windowEnd = addMinutes(request.preferredStart, CANDIDATE_WINDOW_MIN);
+  const windowEnd = searchUntilClose
+    ? snapshot.closeAt
+    : addMinutes(request.preferredStart, CANDIDATE_WINDOW_MIN);
 
   const scored: { candidate: Candidate; gap: number }[] = [];
 
@@ -199,14 +219,16 @@ export function findCandidates(
     });
   }
 
-  // Tightest packing wins; equally tight options go to whichever is closest to the
-  // time actually asked for.
-  scored.sort(
-    (a, b) =>
-      a.gap - b.gap ||
-      Math.abs(minutesBetween(request.preferredStart, a.candidate.start)) -
-        Math.abs(minutesBetween(request.preferredStart, b.candidate.start)),
-  );
+  const byGap = (a: (typeof scored)[number], b: (typeof scored)[number]) => a.gap - b.gap;
+  const byDistance = (a: (typeof scored)[number], b: (typeof scored)[number]) =>
+    Math.abs(minutesBetween(request.preferredStart, a.candidate.start)) -
+    Math.abs(minutesBetween(request.preferredStart, b.candidate.start));
+
+  // Walk-ins: closest to now wins, tightest packing only breaks a tie between two
+  // equally-soon options. Everyone else: tightest packing wins, closeness breaks ties --
+  // see "packing -- fewest dead minutes wins" in scheduler.test.ts for why that's right
+  // when the requester picked a specific time rather than just showing up.
+  scored.sort(prioritizeSoonest ? (a, b) => byDistance(a, b) || byGap(a, b) : (a, b) => byGap(a, b) || byDistance(a, b));
 
   return scored.map((s) => s.candidate);
 }

@@ -64,18 +64,27 @@ export type AvailabilityResult =
   | { status: "closed"; businessDate: string }
   | { status: "open"; businessDate: string; candidates: Candidate[] };
 
-/** The read-only half of booking: what times could this request actually have? */
+/** The read-only half of booking: what times could this request actually have?
+ *
+ *  `walkIn` widens the search to a walk-in's needs -- see the comments on
+ *  FindCandidatesOptions. Scheduled bookings (web/phone/staff, where preferredStart is a
+ *  specific time the requester chose) leave it false and get the default 30-minute,
+ *  packing-first search. */
 export async function getAvailability(
   venue: Venue,
   request: AvailabilityRequest,
   estimatorCfg: EstimatorConfig = DEFAULT_ESTIMATOR_CONFIG,
+  walkIn = false,
 ): Promise<AvailabilityResult> {
   const bDate = businessDateFor(request.preferredStart, venue.timezone, venue.weeklyHours);
   const snapshot = await loadSnapshot(venue, bDate);
   if (!snapshot) return { status: "closed", businessDate: bDate };
 
   // Never offer a start that's already passed -- the scheduler itself is blind to the clock.
-  const candidates = findCandidates(snapshot, request, estimatorCfg, new Date());
+  const candidates = findCandidates(snapshot, request, estimatorCfg, new Date(), {
+    prioritizeSoonest: walkIn,
+    searchUntilClose: walkIn,
+  });
   return { status: "open", businessDate: bDate, candidates };
 }
 

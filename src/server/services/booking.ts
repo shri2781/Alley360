@@ -84,8 +84,13 @@ export async function createBooking(venue: Venue, input: CreateBookingInput) {
   const estimatorCfg = DEFAULT_ESTIMATOR_CONFIG;
   const MAX_ATTEMPTS = 3;
 
+  // A walk-in is standing at the counter waiting -- ranked by soonest available lane
+  // rather than tightest packing, and searched all the way to closing rather than
+  // giving up after 30 minutes. See getAvailability()'s walkIn param.
+  const walkIn = input.source === "walkin";
+
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const availability = await getAvailability(venue, input, estimatorCfg);
+    const availability = await getAvailability(venue, input, estimatorCfg, walkIn);
     if (availability.status === "closed") throw new VenueClosedError(availability.businessDate);
 
     const best = availability.candidates[0];
