@@ -11,15 +11,28 @@ import { hashPassword, verifyPassword } from "../../../../server/auth/password";
 import { validateWeeklyHours, type DayHours, type WeeklyHours } from "../../../../domain/hours";
 import { validateSpecialRate } from "../../../../domain/rates";
 
+const TIMINGS_PATH = "/staff/settings/timings";
+const PRICING_PATH = "/staff/settings/pricing";
+const LANES_PATH = "/staff/settings/lanes";
+const PASSWORD_PATH = "/staff/settings/password";
+
 function revalidateSettings() {
   revalidatePath("/staff/settings");
+  revalidatePath(TIMINGS_PATH);
+  revalidatePath(PRICING_PATH);
+  revalidatePath(LANES_PATH);
+  revalidatePath(PASSWORD_PATH);
   revalidatePath("/"); // rates and hours shown on the customer landing page
   revalidatePath("/book");
   revalidatePath("/staff"); // timeline window depends on venue hours
 }
 
-function fail(message: string): never {
-  redirect("/staff/settings?error=" + encodeURIComponent(message));
+function fail(path: string, message: string): never {
+  redirect(`${path}?error=${encodeURIComponent(message)}`);
+}
+
+function succeed(path: string, message: string): never {
+  redirect(`${path}?success=${encodeURIComponent(message)}`);
 }
 
 /**
@@ -56,10 +69,10 @@ export async function updateVenueHours(formData: FormData) {
       d.closesAtMin <= d.opensAtMin + 1440 &&
       d.closesAtMin % 30 === 0,
   );
-  if (!wellFormed) fail("Enter a valid opening and closing time for every day.");
+  if (!wellFormed) fail(TIMINGS_PATH, "Enter a valid opening and closing time for every day.");
 
   const issues = validateWeeklyHours(weekly);
-  if (issues.length > 0) fail(issues[0]!.message);
+  if (issues.length > 0) fail(TIMINGS_PATH, issues[0]!.message);
 
   await db.transaction(async (tx) => {
     for (const d of weekly) {
@@ -80,7 +93,7 @@ export async function updateVenueHours(formData: FormData) {
   });
 
   revalidateSettings();
-  redirect("/staff/settings?success=" + encodeURIComponent("Alley timings updated."));
+  succeed(TIMINGS_PATH, "Alley timings updated.");
 }
 
 /** Copies Monday's (day_of_week=1) hours onto every other day -- a fast path for the
@@ -104,7 +117,7 @@ export async function copyMondayToAllDays(formData: FormData) {
     closesAtMin > opensAtMin &&
     closesAtMin <= opensAtMin + 1440 &&
     closesAtMin % 30 === 0;
-  if (!wellFormed) fail("Monday's hours must be valid before they can be copied to the rest of the week.");
+  if (!wellFormed) fail(TIMINGS_PATH, "Monday's hours must be valid before they can be copied to the rest of the week.");
 
   await db.transaction(async (tx) => {
     for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
@@ -119,7 +132,7 @@ export async function copyMondayToAllDays(formData: FormData) {
   });
 
   revalidateSettings();
-  redirect("/staff/settings?success=" + encodeURIComponent("Monday's hours copied to every day."));
+  succeed(TIMINGS_PATH, "Monday's hours copied to every day.");
 }
 
 function parseSpecialRateForm(formData: FormData) {
@@ -144,7 +157,7 @@ export async function updateBaseRate(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const pricePerPerson = Number(formData.get("pricePerPerson"));
   if (!name || !Number.isInteger(pricePerPerson) || pricePerPerson < 0) {
-    fail("Enter a valid name and price for the base rate.");
+    fail(PRICING_PATH, "Enter a valid name and price for the base rate.");
   }
 
   await db
@@ -153,7 +166,7 @@ export async function updateBaseRate(formData: FormData) {
     .where(and(eq(rate.tenantId, venue.id), eq(rate.isBase, true)));
 
   revalidateSettings();
-  redirect("/staff/settings?success=" + encodeURIComponent("Base rate updated."));
+  succeed(PRICING_PATH, "Base rate updated.");
 }
 
 export async function addSpecialRate(formData: FormData) {
@@ -162,7 +175,7 @@ export async function addSpecialRate(formData: FormData) {
   const input = parseSpecialRateForm(formData);
 
   const issues = validateSpecialRate(input);
-  if (issues.length > 0) fail(issues[0]!.message);
+  if (issues.length > 0) fail(PRICING_PATH, issues[0]!.message);
 
   const [row] = await db
     .select({ maxPriority: max(rate.priority) })
@@ -181,7 +194,7 @@ export async function addSpecialRate(formData: FormData) {
   });
 
   revalidateSettings();
-  redirect("/staff/settings?success=" + encodeURIComponent("Rate added."));
+  succeed(PRICING_PATH, "Rate added.");
 }
 
 export async function updateSpecialRate(rateId: string, formData: FormData) {
@@ -190,7 +203,7 @@ export async function updateSpecialRate(rateId: string, formData: FormData) {
   const input = parseSpecialRateForm(formData);
 
   const issues = validateSpecialRate(input);
-  if (issues.length > 0) fail(issues[0]!.message);
+  if (issues.length > 0) fail(PRICING_PATH, issues[0]!.message);
 
   await db
     .update(rate)
@@ -204,7 +217,7 @@ export async function updateSpecialRate(rateId: string, formData: FormData) {
     .where(and(eq(rate.id, rateId), eq(rate.tenantId, venue.id), eq(rate.isBase, false)));
 
   revalidateSettings();
-  redirect("/staff/settings?success=" + encodeURIComponent("Rate updated."));
+  succeed(PRICING_PATH, "Rate updated.");
 }
 
 /** The base rate can never be deactivated (rate_base_shape enforces this at the DB
@@ -282,17 +295,17 @@ export async function changePassword(formData: FormData) {
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
   if (newPassword.length < 8) {
-    fail("New password must be at least 8 characters.");
+    fail(PASSWORD_PATH, "New password must be at least 8 characters.");
   }
   if (newPassword !== confirmPassword) {
-    fail("New password and confirmation don't match.");
+    fail(PASSWORD_PATH, "New password and confirmation don't match.");
   }
 
   const [row] = await db.select().from(staffUser).where(eq(staffUser.id, user.id));
   if (!row || !(await verifyPassword(currentPassword, row.passwordHash))) {
-    fail("Current password is incorrect.");
+    fail(PASSWORD_PATH, "Current password is incorrect.");
   }
 
   await db.update(staffUser).set({ passwordHash: await hashPassword(newPassword) }).where(eq(staffUser.id, user.id));
-  redirect("/staff/settings?success=" + encodeURIComponent("Password updated."));
+  succeed(PASSWORD_PATH, "Password updated.");
 }

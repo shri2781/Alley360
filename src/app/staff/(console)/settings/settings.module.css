@@ -1,7 +1,79 @@
 .title {
   font-size: 26px;
   font-weight: 800;
+  margin: 0 0 8px;
+}
+
+.backLink {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-decoration: none;
+  margin-bottom: 10px;
+}
+
+.backLink:hover {
+  color: var(--accent);
+}
+
+.pageDescription {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
   margin: 0 0 20px;
+  max-width: 640px;
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.menuRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  text-decoration: none;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s ease;
+}
+
+.menuRow:last-child {
+  border-bottom: none;
+}
+
+.menuRow:hover {
+  background: var(--bg);
+}
+
+.menuText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.menuTitle {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.menuSubtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.menuChevron {
+  font-size: 22px;
+  color: var(--text-muted);
+  line-height: 1;
 }
 
 .errorBanner {
@@ -36,57 +108,48 @@
 .section {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 20px;
+  border-radius: 14px;
+  padding: 24px 26px;
   margin-bottom: 20px;
 }
 
-.sectionTitle {
-  font-size: 15px;
-  font-weight: 700;
-  margin: 0 0 4px;
-}
-
-.sectionSubtitle {
-  font-size: 12px;
+/* A labelled sub-heading that separates one cluster of controls (e.g. "Base
+ * rate") from the next (e.g. "Special rates") within a single section. */
+.groupLabel {
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--text-muted);
-  margin: 0 0 16px;
+  margin: 0 0 12px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--border);
 }
 
-.hoursRow {
-  display: flex;
-  align-items: flex-end;
-  gap: 14px;
-  flex-wrap: wrap;
+.groupLabel:first-child {
+  padding-top: 0;
+  border-top: none;
 }
 
-.hoursField {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-  min-width: 160px;
-}
-
-.hoursCaption {
-  margin: 12px 0 0;
-  font-size: 12px;
-  color: var(--text-muted);
+.groupLabel strong {
+  color: var(--text);
 }
 
 .hoursTable {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
 }
 
 .hoursDayRow {
   display: grid;
-  grid-template-columns: 90px 1fr 1fr auto;
-  gap: 10px;
+  grid-template-columns: 60px 1fr 1fr 100px;
+  gap: 12px;
   align-items: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.hoursDayRow:hover {
+  background: var(--bg);
 }
 
 .hoursDayLabel {
@@ -97,18 +160,66 @@
 .hoursClosedLabel {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   font-size: 12px;
   color: var(--text-muted);
   white-space: nowrap;
+}
+
+.hoursClosedLabel input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
 }
 
 .hoursActions {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 4px;
+  margin-top: 14px;
   flex-wrap: wrap;
+}
+
+.hoursCaption {
+  margin: 14px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* A label wrapping an input/select, stacking a small caption above the
+ * control. Used wherever a field needs a stable width in a flex row --
+ * without this, `.input`'s width:100% resolves to a 100% flex-basis and
+ * forces every field onto its own line. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  flex: 1 1 200px;
+  min-width: 160px;
+}
+
+.fieldNarrow {
+  flex: 0 1 150px;
+  min-width: 110px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .rateBaseRow {
@@ -122,40 +233,67 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  margin-bottom: 16px;
 }
 
 .rateRow {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
 }
 
 .rateRowTop {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  align-items: center;
-}
-
-.rateRowTop .input {
-  flex: 1 1 160px;
+  align-items: flex-end;
 }
 
 .rateDays {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .rateDayToggle {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
   font-size: 12px;
+  font-weight: 600;
   color: var(--text-muted);
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.rateDayToggle:hover {
+  border-color: var(--text-muted);
+}
+
+.rateDayToggle:has(input:checked) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.rateDayToggle:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.rateDayToggle input[type="checkbox"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
 }
 
 .rateWindow {
@@ -164,7 +302,14 @@
   gap: 8px;
   flex-wrap: wrap;
   font-size: 12px;
+  font-weight: 600;
   color: var(--text-muted);
+}
+
+.timeSelect {
+  width: auto;
+  flex: 0 1 170px;
+  min-width: 130px;
 }
 
 .rateRowActions {
@@ -176,32 +321,40 @@
 .weekPreview {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 4px;
 }
 
 .weekPreviewDay {
   display: flex;
-  gap: 12px;
-  align-items: baseline;
+  gap: 14px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
   flex-wrap: wrap;
 }
 
+.weekPreviewDay:first-child {
+  border-top: none;
+}
+
 .weekPreviewLabel {
-  min-width: 40px;
+  min-width: 36px;
   font-size: 12px;
   font-weight: 700;
 }
 
 .weekPreviewSegments {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .weekPreviewSegment {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 9px;
 }
 
 .weekPreviewClosed {
@@ -212,28 +365,71 @@
 
 .input {
   font: inherit;
-  padding: 7px 9px;
-  border-radius: 6px;
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text);
   width: 100%;
+  transition: border-color 0.15s ease;
+}
+
+.input:hover {
+  border-color: var(--text-muted);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .inactiveRow {
-  opacity: 0.5;
+  opacity: 0.55;
 }
 
 .btn {
   font: inherit;
   font-size: 12px;
   font-weight: 700;
-  padding: 7px 10px;
-  border-radius: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: transparent;
   color: var(--text);
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.btn:hover {
+  background: var(--surface);
+  border-color: var(--text-muted);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btnPrimary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btnPrimary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btnAdd {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
+.btnAdd:hover {
+  color: var(--text);
 }
 
 .laneGrid {
@@ -245,7 +441,8 @@
 .laneChip {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 12px;
